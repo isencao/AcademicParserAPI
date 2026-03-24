@@ -3,207 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parser AI | Academic Hub</title>
+    <title>Parser AI | Enterprise Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { 
-            --primary: #2563eb; 
-            --success: #059669;
-            --excel: #0ea5e9;
-            --danger: #ef4444; 
-            --bg: #f8fafc; 
-            --sidebar: #0f172a; 
-            --card: #ffffff; 
-            --text: #1e293b;
-        }
-
+        :root { --primary: #2563eb; --success: #059669; --excel: #0ea5e9; --danger: #ef4444; --bg: #f8fafc; --sidebar: #0f172a; --card: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); display: flex; color: var(--text); }
-        
-        /* Sol Panel */
-        .sidebar { width: 260px; height: 100vh; background: var(--sidebar); color: white; padding: 2.5rem 1.5rem; position: fixed; display: flex; flex-direction: column; gap: 2rem; }
-        .sidebar h2 { color: #38bdf8; font-size: 1.6rem; letter-spacing: -1px; }
-        .sidebar-info { font-size: 0.8rem; color: #64748b; line-height: 1.4; }
-
-        /* Ana İçerik */
-        .main { margin-left: 260px; width: calc(100% - 260px); display: flex; justify-content: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 1200px; padding: 3rem 2rem; }
-
-        /* Üst Kontrol Paneli */
-        .controls { 
-            background: var(--card); padding: 1.5rem; border-radius: 16px; 
-            display: flex; gap: 12px; align-items: center; 
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 2.5rem; 
-            border: 1px solid #e2e8f0; flex-wrap: wrap;
-        }
-
-        .search-input { flex-grow: 1; padding: 0.8rem 1.2rem; border: 1px solid #e2e8f0; border-radius: 12px; outline: none; transition: 0.2s; font-size: 0.9rem; }
-        .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); }
-
-        .select-filter { padding: 0.8rem; border-radius: 12px; border: 1px solid #e2e8f0; background: white; cursor: pointer; font-size: 0.9rem; }
-
-        /* Buton Grubu */
-        .btn { padding: 0.8rem 1.2rem; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 8px; color: white; }
+        .sidebar { width: 260px; height: 100vh; background: var(--sidebar); color: white; padding: 2.5rem 1.5rem; position: fixed; }
+        .sidebar h2 { color: #38bdf8; margin-bottom: 1rem; }
+        .main { margin-left: 260px; width: calc(100% - 260px); padding: 3rem 2rem; }
+        .controls { background: var(--card); padding: 1.5rem; border-radius: 16px; display: flex; gap: 12px; align-items: center; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .btn { padding: 0.8rem 1.2rem; border-radius: 12px; border: none; cursor: pointer; font-weight: 600; color: white; transition: 0.2s; }
         .btn-primary { background: var(--primary); }
         .btn-success { background: var(--success); }
         .btn-excel { background: var(--excel); }
         .btn-danger { background: #fee2e2; color: var(--danger); }
-        .btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1); }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* Kart Yapısı */
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; }
-        .card { 
-            background: var(--card); padding: 1.8rem; border-radius: 18px; 
-            border-top: 6px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.04); 
-            transition: 0.3s; animation: slideUp 0.4s ease-out; position: relative;
-        }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 20px -5px rgba(0,0,0,0.1); }
         
-        /* Kategori Renkleri */
+        .dashboard-panel { display: flex; gap: 2rem; margin-bottom: 2rem; align-items: flex-start; }
+        .chart-container { background: var(--card); padding: 1.5rem; border-radius: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 300px; height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: sticky; top: 2rem; }
+        
+        .content-area { flex-grow: 1; display: flex; flex-direction: column; }
+        .search-box { width: 100%; padding: 1rem 1.2rem; border-radius: 12px; border: 1px solid #cbd5e1; margin-bottom: 1rem; font-family: inherit; font-size: 1rem; outline: none; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .search-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        .filter-group { display: flex; gap: 10px; margin-bottom: 1.5rem; }
+        .filter-btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; color: #475569; font-weight: 600; transition: 0.2s; }
+        .filter-btn:hover { background: #f1f5f9; }
+        .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem; align-content: start; }
+        .card { background: var(--card); padding: 1.8rem; border-radius: 18px; border-top: 6px solid var(--primary); animation: fadeIn 0.4s; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .card.Theorem { border-top-color: #ef4444; }
         .card.Definition { border-top-color: #10b981; }
         .card.Lemma { border-top-color: #f59e0b; }
-
-        .card-tag { font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px; display: block; letter-spacing: 1px; }
-        .card-body { font-size: 1rem; line-height: 1.6; color: #334155; margin-bottom: 1.5rem; min-height: 60px; }
-        .card-footer { font-size: 0.75rem; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 12px; display: flex; justify-content: space-between; }
-
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
-
     <div class="sidebar">
-        <div>
-            <h2>🎓 Parser AI</h2>
-            <p>Cloud AI Academic Assistant</p>
-        </div>
-        <div class="sidebar-info">
-            Bu panel, Google Gemini 1.5 Flash modelini kullanarak akademik dökümanları ışık hızında analiz eder.
-        </div>
-        <div style="margin-top: auto; font-size: 0.7rem; color: #475569;">
-            Versiyon 3.0 - Python & FastAPI
-        </div>
+        <h2>🎓 Parser AI</h2>
+        <p style="font-size: 0.8rem; color: #64748b;">Groq + Llama 3.3 Engine</p>
     </div>
-
     <div class="main">
-        <div class="container">
-            <h1 style="margin-bottom: 2rem; font-weight: 800; font-size: 2.2rem;">Araştırma Paneli</h1>
-
-            <div class="controls">
-                <input type="text" id="searchInput" class="search-input" placeholder="Notlarda veya kaynaklarda ara..." oninput="filterNotes()">
+        <div class="controls">
+            <input type="file" id="pdfFile" accept=".pdf" style="font-size: 0.8rem;">
+            <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()">🚀 Analyze</button>
+            <div style="flex-grow: 1;"></div>
+            <button class="btn btn-success" onclick="exportMd()">📥 MD</button>
+            <button class="btn btn-excel" onclick="exportCsv()">📊 CSV</button>
+            <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All</button>
+        </div>
+        
+        <div class="dashboard-panel">
+            <div class="chart-container">
+                <h3 style="margin-bottom: 10px; font-size: 1rem; color: #475569;">Data Distribution</h3>
+                <canvas id="statsChart"></canvas>
+            </div>
+            
+            <div class="content-area">
+                <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search in content, category, or source file..." onkeyup="applyFilters()">
                 
-                <select id="catFilter" class="select-filter" onchange="filterNotes()">
-                    <option value="All">Tüm Kategoriler</option>
-                    <option value="Theorem">Teoremler</option>
-                    <option value="Definition">Tanımlar</option>
-                    <option value="Lemma">Lemmalar</option>
-                    <option value="General">Genel Notlar</option>
-                </select>
-
-                <div style="display: flex; gap: 8px; align-items: center; border-left: 2px solid #f1f5f9; padding-left: 15px;">
-                    <input type="file" id="pdfFile" accept=".pdf" style="font-size: 0.8rem; width: 170px;">
-                    <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()">🚀 Analiz Et</button>
+                <div class="filter-group">
+                    <button class="filter-btn active" onclick="setFilter('ALL', this)">All</button>
+                    <button class="filter-btn" onclick="setFilter('DEFINITION', this)">Definitions</button>
+                    <button class="filter-btn" onclick="setFilter('THEOREM', this)">Theorems</button>
+                    <button class="filter-btn" onclick="setFilter('LEMMA', this)">Lemmas</button>
                 </div>
 
-                <button class="btn btn-success" onclick="exportAsMarkdown()">📥 Markdown</button>
-                <button class="btn btn-excel" onclick="exportAsExcel()">📊 Excel (CSV)</button>
-                <button class="btn btn-danger" onclick="clearAll()">🗑️ Sıfırla</button>
+                <div id="notesContainer" class="grid"></div>
             </div>
-
-            <div id="notesContainer" class="grid"></div>
         </div>
     </div>
 
     <script>
-        // API Adresimiz artık Python FastAPI portu olan 8000
-        const API_URL = 'http://localhost:8000/api/notes';
-        let allNotes = [];
+        const API_URL = 'http://localhost:8000/api';
+        let myChart = null; 
+        let allNotes = []; 
+        let currentFilter = 'ALL'; 
+
+        async function fetchData() {
+            await fetchNotes();
+            await fetchStats();
+        }
 
         async function fetchNotes() {
             try {
-                const res = await fetch(API_URL);
-                allNotes = await res.json();
-                renderNotes(allNotes);
-            } catch (err) { console.error("API Bağlantı Hatası:", err); }
+                const res = await fetch(`${API_URL}/notes`);
+                allNotes = await res.json(); 
+                applyFilters(); 
+            } catch (err) { console.error("Error fetching notes:", err); }
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch(`${API_URL}/stats`);
+                const stats = await res.json();
+                renderChart(stats);
+            } catch (err) { console.error("Error fetching stats:", err); }
+        }
+
+        function setFilter(category, btnElement) {
+            currentFilter = category;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+            applyFilters();
+        }
+
+        function getDisplayCategory(rawCat) {
+            if (!rawCat) return "DEFINITION";
+            let upperCat = rawCat.toUpperCase();
+            if (upperCat.includes("TEOREM") || upperCat.includes("THEOREM")) return "THEOREM";
+            if (upperCat.includes("LEMMA")) return "LEMMA";
+            return "DEFINITION";
+        }
+
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            const filteredNotes = allNotes.filter(n => {
+                const displayCat = getDisplayCategory(n.Category);
+                
+                let matchCategory = false;
+                if(currentFilter === 'ALL') matchCategory = true;
+                else if(currentFilter === displayCat) matchCategory = true;
+
+                const safeContent = (n.Content || "").toLowerCase();
+                const safeSource = (n.Source || "").toLowerCase();
+                const safeCat = displayCat.toLowerCase(); 
+
+                const matchSearch = safeContent.includes(searchTerm) || 
+                                    safeSource.includes(searchTerm) ||
+                                    safeCat.includes(searchTerm);
+
+                return matchCategory && matchSearch;
+            });
+
+            renderNotes(filteredNotes);
         }
 
         function renderNotes(notes) {
             const container = document.getElementById('notesContainer');
-            if (notes.length === 0) {
-                container.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 4rem; color:#94a3b8;">Henüz analiz edilmiş bir not yok. PDF yükleyerek başlayın.</div>`;
+            
+            if(notes.length === 0) {
+                container.innerHTML = `<div style="color: #64748b; font-style: italic; padding: 1rem;">No results found...</div>`;
                 return;
             }
 
-            container.innerHTML = notes.map(n => `
-                <div class="card ${n.Category}">
-                    <span class="card-tag">${n.Category}</span>
-                    <div class="card-body">${n.Content}</div>
-                    <div class="card-footer">
-                        <span>📍 ${n.Source}</span>
-                        <span>📅 ${new Date(n.CreatedAt).toLocaleDateString('tr-TR')}</span>
+            container.innerHTML = notes.map(n => {
+                const displayCat = getDisplayCategory(n.Category);
+                let borderClass = displayCat === "THEOREM" ? "Theorem" : (displayCat === "LEMMA" ? "Lemma" : "Definition");
+                
+                return `
+                    <div class="card ${borderClass}">
+                        <strong style="display:block; margin-bottom:10px; color:#64748b;">${displayCat}</strong>
+                        <div>${n.Content || ""}</div>
+                        <div style="margin-top:15px; font-size:0.7rem; color:#94a3b8;">📍 ${n.Source || "Unknown"} | 🗓️ ${(n.CreatedAt || "").split('T')[0]}</div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
-        function filterNotes() {
-            const term = document.getElementById('searchInput').value.toLowerCase();
-            const cat = document.getElementById('catFilter').value;
+        function renderChart(stats) {
+            const canvas = document.getElementById('statsChart');
+            if(!canvas) return; 
+            
+            const ctx = canvas.getContext('2d');
+            if(myChart != null) { myChart.destroy(); }
 
-            const filtered = allNotes.filter(n => {
-                const matchesSearch = n.Content.toLowerCase().includes(term) || n.Source.toLowerCase().includes(term);
-                const matchesCat = (cat === "All" || n.Category === cat);
-                return matchesSearch && matchesCat;
+            const defCount = (stats.Definition || 0) + (stats.TANIM || 0) + (stats.Tanım || 0) + (stats.DEFINITION || 0);
+            const thmCount = (stats.Theorem || 0) + (stats.TEOREM || 0) + (stats.Teorem || 0) + (stats.THEOREM || 0);
+            const lemCount = (stats.Lemma || 0) + (stats.LEMMA || 0);
+
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Definition', 'Theorem', 'Lemma'],
+                    datasets: [{
+                        data: [defCount, thmCount, lemCount],
+                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+                }
             });
-            renderNotes(filtered);
         }
 
         async function uploadPdf() {
-            const fileInput = document.getElementById('pdfFile');
+            const file = document.getElementById('pdfFile').files[0];
             const btn = document.getElementById('uploadBtn');
-
-            if (!fileInput.files[0]) return alert("Lütfen bir PDF seçin!");
+            if(!file) return alert("Select a file!");
 
             const fd = new FormData();
-            fd.append('file', fileInput.files[0]);
+            fd.append('file', file);
+            
+            btn.disabled = true;
+            btn.innerHTML = "⏳ Processing...";
 
             try {
-                btn.disabled = true;
-                btn.innerHTML = "⏳ Gemini Analiz Ediyor...";
-
-                const res = await fetch(`${API_URL}/upload`, { method: 'POST', body: fd });
-                const data = await res.json();
+                const res = await fetch(`${API_URL}/notes/upload`, { method: 'POST', body: fd });
+                if(!res.ok) throw new Error(await res.text());
                 
-                if (res.ok) {
-                    fetchNotes(); // Analiz bittiği an listeyi yenile
-                    fileInput.value = ""; // Seçili dosyayı temizle
-                } else {
-                    throw new Error(data.detail || data.message);
-                }
-            } catch (err) {
-                alert("Hata: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = "🚀 Analiz Et";
-            }
+                document.getElementById('searchInput').value = '';
+                document.querySelector('.filter-btn').click(); 
+                
+                fetchData(); 
+            } catch (err) { alert("Error: " + err.message); } 
+            finally { btn.disabled = false; btn.innerHTML = "🚀 Analyze"; }
         }
 
-        function exportAsMarkdown() {
-            window.location.href = `${API_URL}/export/md`;
+        function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }
+        function exportMd() { window.location.href = `${API_URL}/notes/export/md`; }
+        async function clearAll() { 
+            if(confirm("All data will be deleted. Are you sure?")) { 
+                await fetch(`${API_URL}/notes/clear-all`, { method: 'DELETE' }); 
+                fetchData(); 
+            } 
         }
 
-        function exportAsExcel() {
-            window.location.href = `${API_URL}/export/csv`;
-        }
-
-        async function clearAll() {
-            if (!confirm("Tüm notlar silinecek. Emin misin adaş?")) return;
-            await fetch(`${API_URL}/clear-all`, { method: 'DELETE' });
-            fetchNotes();
-        }
-
-        fetchNotes();
+        fetchData();
     </script>
 </body>
 </html>
