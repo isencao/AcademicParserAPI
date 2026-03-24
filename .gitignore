@@ -25,5 +25,7 @@ Thumbs.db
 
 echo "Uploads/*"
 echo "__pycache__/"
-echo "*.db" >>
-echo ".env" >>
+echo "*.db" 
+echo ".env" 
+
+export.csv
