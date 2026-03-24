@@ -22,7 +22,7 @@ def clear_all():
     conn.execute("DELETE FROM Notes")
     conn.commit()
     conn.close()
-    return {"message": "Sıfırlandı."}
+    return {"message": "Deleted."}
 
 @router.post("/api/notes/upload")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -57,7 +57,7 @@ async def upload_pdf(file: UploadFile = File(...)):
             )
         conn.commit()
         conn.close()
-        return {"message": "Başarılı!"}
+        return {"message": "Successful!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -68,13 +68,13 @@ def export_csv():
     conn.close()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
-    writer.writerow(["Kategori", "Icerik", "Kaynak", "Tarih"])
+    writer.writerow(["Category", "Content", "Source", "Date"])
     for n in notes:
         writer.writerow([n[0], n[1].replace('\n', ' '), n[2], n[3]])
     return StreamingResponse(
         iter(["\ufeff" + output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=Akademik_Notlar.csv"}
+        headers={"Content-Disposition": "attachment; filename=Academic_Notes.csv"}
     )
 
 @router.get("/api/notes/export/md")
@@ -82,7 +82,7 @@ def export_md():
     conn = get_db_connection()
     notes = conn.execute("SELECT Category, Content, Source, CreatedAt FROM Notes ORDER BY CreatedAt DESC").fetchall()
     conn.close()
-    md = "# 🎓 Akademik Analiz Raporu\n\n"
+    md = "# 🎓 Academic Analysis Report\n\n"
     for n in notes:
         md += f"### [{n[0]}] - {n[2]}\n> {n[1]}\n\n---\n\n"
     return StreamingResponse(

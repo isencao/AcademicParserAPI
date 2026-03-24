@@ -1,0 +1,5 @@
+ID,Category,Content,Source,CreatedAt
+84,Theorem,"Dağıtık bir veri tabanı sisteminde Tutarlılık (Consistency), Erişilebilirlik (Availability) ve Bölünme Toleransı (Partition Tolerance) özelliklerinin üçünün birden aynı anda garanti edilmesi imkansızdır.",test.pdf,2026-03-24 13:01:59
+83,Definition,"Nesne yönelimli programlamada, farklı sınıflara ait nesnelerin aynı arayüz üzerinden farklı şekillerde davranabilme yeteneği olarak tanımlanan polimorfizmdir.",test.pdf,2026-03-24 13:01:59
+82,TAGS,"nesne yönelimli programlama, polimorfizm, CAP teoremi, dağıtık veri tabanı sistemleri",test.pdf,2026-03-24 13:01:59
+81,SUMMARY,Nesne yönelimli programlamada polimorfizm ve dağıtık veri tabanı sistemlerinde CAP teoremi hakkında bilgi verilmektedir.,test.pdf,2026-03-24 13:01:59

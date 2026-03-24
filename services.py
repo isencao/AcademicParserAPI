@@ -1,77 +1,66 @@
 import os
 import json
-import fitz  
-from pdf2image import convert_from_path
+import fitz  # PyMuPDF
 import pytesseract
-from dotenv import load_dotenv
+from pdf2image import convert_from_path
+from PIL import Image
 from groq import Groq
+from dotenv import load_dotenv
 
-# --- AYARLAR ---
 load_dotenv()
-api_key = os.getenv("GROQ_API_KEY")
 
-if not api_key:
-    print("❌ HATA: .env dosyasında GROQ_API_KEY bulunamadı!")
-    
+api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# --- 1. METİN ÇIKARMA (HİBRİT MOTOR) ---
-def extract_text_from_pdf(temp_path):
-    # Aşama A: Normal PDF Okuma (Çok Hızlıdır)
+def extract_text_from_pdf(pdf_path):
     text = ""
     try:
-        doc = fitz.open(temp_path)
+        doc = fitz.open(pdf_path)
         for page in doc:
-            extracted = page.get_text()
-            if extracted:
-                text += extracted + "\n"
-        doc.close()
+            page_text = page.get_text()
+            if page_text.strip():
+                text += page_text + "\n"
+            else:
+                print(f"Sayfa {page.number} taranıyor (OCR devrede)...")
+                images = convert_from_path(pdf_path, first_page=page.number+1, last_page=page.number+1)
+                for image in images:
+                    text += pytesseract.image_to_string(image) + "\n"
     except Exception as e:
-        print(f"PyMuPDF Okuma Hatası: {e}")
+        print(f"❌ PDF Okuma Hatası: {e}")
+    return text
 
-    # Eğer 50 karakterden fazla metin bulduysa, bu normal bir PDF'tir. İşi bitir.
-    if len(text.strip()) > 50:
-        print("📄 Metin tabanlı PDF algılandı. (OCR'a gerek kalmadı)")
-        return text
-
-    # Aşama B: Fotoğraf/Taranmış PDF Okuma (Tesseract OCR Devrede!)
-    print("\n📸 Taranmış dosya veya fotoğraf algılandı!")
-    print("⏳ Tesseract OCR ve Poppler motorları çalıştırılıyor... Lütfen bekleyin.")
-    
-    ocr_text = ""
-    try:
-        # Poppler dosyayı resimlere böler
-        pages = convert_from_path(temp_path, poppler_path=r'C:\Program Files\poppler-25.12.0\Library\bin')
-        
-        # Tesseract her resmi tek tek okur
-        for i, page in enumerate(pages):
-            print(f"   👁️ Sayfa {i+1} taranıyor...")
-            # lang='tur+eng' ile Türkçe karakterleri de (ş, ğ, ç vb.) sorunsuz okur
-            ocr_text += pytesseract.image_to_string(page, lang='tur+eng') + "\n"
-            
-        print("✅ OCR işlemi başarıyla tamamlandı!")
-        return ocr_text
-    except Exception as e:
-        print(f"❌ OCR SİSTEM HATASI: {e}")
-        print("💡 Poppler veya Tesseract PATH ayarlarında sorun olabilir.")
-        return ""
-
-# --- 2. YAPAY ZEKA ANALİZİ ---
-def analyze_with_groq(text):
+def analyze_with_groq(text, target_lang="auto"):
     if not text.strip():
         return []
         
-    print("\n" + "="*40)
-    print("🧠 GROQ + LLAMA 3.3 ANALİZİ BAŞLADI...")
+    print(f"\n🧠 GROQ NLP ANALİZİ BAŞLADI (Hedef Dil: {target_lang.upper()})...")
     
+    if target_lang == "tr":
+        lang_instruction = "JSON değerlerini ('summary', 'tags' ve 'Content' içlerini) KESİNLİKLE TÜRKÇE YAZ. Orijinal metin İngilizce olsa bile bu metinleri Türkçeye ÇEVİR."
+    elif target_lang == "en":
+        lang_instruction = "JSON değerlerini ('summary', 'tags' ve 'Content' içlerini) KESİNLİKLE İNGİLİZCE YAZ. Orijinal metin Türkçe olsa bile bu metinleri İngilizceye ÇEVİR."
+    else:
+        lang_instruction = "JSON değerlerini METNİN ORİJİNAL DİLİNDE YAZ. Çeviri yapma."
+
     prompt = f"""
-    Sen uzman bir akademik asistansın. Metni analiz et ve tanımları, teoremleri ve lemmaları bul.
-    Sonucu SADECE geçerli bir JSON dizisi olarak döndür. Başka hiçbir açıklama yazma.
-    ÖNEMLİ KURAL: 'Category' alanı KESİNLİKLE sadece 'Definition', 'Theorem' veya 'Lemma' kelimelerinden (İngilizce) biri olmalıdır. Türkçe kullanma.
-    Format: [{{"Category": "Definition", "Content": "..."}}]
+    Sen uzman bir akademik veri bilimcisisin. Metni analiz et ve SADECE aşağıdaki JSON formatında tek bir çıktı üret.
+    
+    ÇOK ÖNEMLİ KURALLAR:
+    1. HEDEF DİL: {lang_instruction}
+    2. ATLAMAK YASAK (NO SKIPPING): Metindeki İSTİSNASIZ TÜM Tanım, Teorem ve Lemmaları bul! Sadece 1-2 tane bulup bırakmak YASAKTIR.
+    3. JSON KORUMASI: JSON anahtarları ve 'Category' DEĞERLERİ (Definition, Theorem, Lemma) KESİNLİKLE İNGİLİZCE KALMALIDIR! Çeviriyi SADECE 'summary', 'tags' ve 'Content' değerlerine uygula.
+    
+    ÖRNEK ÇIKTI FORMATI:
+    {{
+        "summary": "Makalenin istenen dilde çevrilmiş genel özeti.",
+        "tags": ["etiket1", "etiket2"],
+        "notes": [
+            {{"Category": "Definition", "Content": "Bulunan 1. tanımın istenen dildeki çevirisi..."}},
+            {{"Category": "Theorem", "Content": "Bulunan 1. teoremin istenen dildeki çevirisi..."}}
+        ]
+    }}
+    
+    Sadece geçerli JSON döndür. Başka hiçbir açıklama yazma.
     Metin:
     {text}
     """
@@ -84,15 +73,26 @@ def analyze_with_groq(text):
         
         raw_response = completion.choices[0].message.content
         clean_json = raw_response.strip()
+        
         if clean_json.startswith("```json"):
             clean_json = clean_json[7:-3].strip()
         elif clean_json.startswith("```"):
             clean_json = clean_json[3:-3].strip()
             
         data = json.loads(clean_json)
-        if isinstance(data, dict) and "notes" in data:
-            return data["notes"]
-        return data if isinstance(data, list) else [data]
+        
+        final_list = []
+        if isinstance(data, dict):
+            if "summary" in data and data["summary"]:
+                final_list.append({"Category": "SUMMARY", "Content": data["summary"]})
+            if "tags" in data and data["tags"]:
+                final_list.append({"Category": "TAGS", "Content": ", ".join(data["tags"])})
+            if "notes" in data:
+                final_list.extend(data["notes"])
+        elif isinstance(data, list):
+            final_list.extend(data)
+            
+        return final_list
     except Exception as e:
         print(f"❌ GROQ ANALİZ HATASI: {e}")
         return []

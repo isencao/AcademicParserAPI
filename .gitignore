@@ -22,3 +22,8 @@ academic_notes.db
 
 *.log
 Thumbs.db
+
+echo "Uploads/*"
+echo "__pycache__/"
+echo "*.db" >>
+echo ".env" >>
