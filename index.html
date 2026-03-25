@@ -106,8 +106,9 @@
     <div class="sidebar">
         <h2>PARSER<span>AI</span></h2>
         <div style="margin-top: 2rem; color: var(--text-muted); font-size: 0.8rem;">ENGINE STATUS</div>
-        <div style="display: flex; align-items: center; gap: 8px; color: var(--success); font-size: 0.9rem; margin-top: 0.5rem;">
-            <div style="width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success);"></div> Ready
+        <div id="engineStatusIndicator" style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem; transition: 0.3s;">
+            <div id="engineStatusDot" style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; transition: 0.3s;"></div> 
+            <span id="engineStatusText">Checking...</span>
         </div>
         <button class="logout-btn" onclick="logout()">Terminate Session</button>
     </div>
@@ -155,7 +156,34 @@
         if(!currentApiKey) { document.getElementById('loginOverlay').style.display = 'flex'; } 
         else { document.getElementById('loginOverlay').style.display = 'none'; fetchData(); }
 
-        // YENİ VE GÜVENLİ LOGIN FONKSİYONU
+        // SUNUCU DURUMUNU (HEALTH CHECK) KONTROL EDEN FONKSİYON
+       async function checkEngineStatus() {
+            const dot = document.getElementById('engineStatusDot');
+            const text = document.getElementById('engineStatusText');
+            const indicator = document.getElementById('engineStatusIndicator');
+
+            try {
+                // Artık OPTIONS ile değil, standart GET metoduyla doğru nabız ucunu dinliyoruz
+                const res = await fetch(`${API_URL}/health`);
+                if (res.ok) {
+                    indicator.style.color = "var(--success)";
+                    dot.style.background = "var(--success)";
+                    dot.style.boxShadow = "0 0 10px var(--success)";
+                    text.innerText = "Ready (Online)";
+                }
+            } catch (error) {
+                // Sunucu kapalıysa Fetch patlar ve buraya düşer
+                indicator.style.color = "var(--danger)";
+                dot.style.background = "var(--danger)";
+                dot.style.boxShadow = "0 0 10px var(--danger)";
+                text.innerText = "Offline (Server Down)";
+            }
+        }
+
+        // Sayfa açıldığında kontrol et, sonra her 5 saniyede bir nabız yokla!
+        checkEngineStatus();
+        setInterval(checkEngineStatus, 5000);
+
         async function login() {
             const pass = document.getElementById('passInput').value;
             const btn = document.getElementById('loginBtn');
@@ -169,20 +197,17 @@
             errorText.style.display = "none";
 
             try {
-                // Şifreyi sunucuya soruyoruz (Ekrani gizlemeden önce!)
                 const res = await fetch(`${API_URL}/stats`, { headers: { 'X-API-Key': pass } });
                 
                 if(res.ok) {
-                    // Şifre doğruysa içeri al
                     localStorage.setItem('api_key', pass); 
                     currentApiKey = pass; 
                     document.getElementById('loginOverlay').style.display = 'none'; 
                     fetchData();
                 } else {
-                    // Şifre hatalıysa animasyon oynat ve hata ver
                     errorText.style.display = "block";
                     box.classList.remove("shake-animation");
-                    void box.offsetWidth; // Animasyonu sıfırlamak için DOM hilesi
+                    void box.offsetWidth;
                     box.classList.add("shake-animation");
                 }
             } catch (err) {
@@ -199,7 +224,6 @@
         async function fetchWithAuth(url, options = {}) {
             options.headers = { ...options.headers, 'X-API-Key': currentApiKey };
             const res = await fetch(url, options);
-            // Eğer içerideyken şifre geçersiz olursa dışarı at
             if (res.status === 401) { logout(); throw new Error("Unauthorized"); }
             return res;
         }
@@ -224,7 +248,8 @@
         function applyFilters() {
             const search = document.getElementById('searchInput').value.toLowerCase();
             const filtered = allNotes.filter(n => {
-                const cat = (n.Category || "").toUpperCase();
+                // Hem büyük hem küçük harfli anahtarları destekle
+                const cat = (n.category || n.Category || "").toUpperCase();
                 let matchCat = currentFilter === 'ALL' || (currentFilter === 'SUMMARY' && (cat === 'SUMMARY' || cat === 'TAGS')) || cat.includes(currentFilter);
                 return matchCat && JSON.stringify(n).toLowerCase().includes(search);
             });
@@ -236,16 +261,25 @@
             if(!notes.length) return container.innerHTML = `<div style="color: var(--text-muted); opacity: 0.5;">No intelligence found...</div>`;
             
             container.innerHTML = notes.map(n => {
-                const cat = (n.Category || "DEFINITION").toUpperCase();
+                // Veritabanı (küçük harf) veya Yapay Zeka (büyük harf) fark etmeksizin veriyi yakala
+                const cat = (n.category || n.Category || "DEFINITION").toUpperCase();
+                const content = n.content || n.Content || "";
+                const source = n.source || n.Source || "Bilinmiyor";
+                const page = n.page || n.Page || "-";
+                const date = n.created_at || n.CreatedAt || "";
+
                 if(cat === "TAGS") {
-                    const tags = (n.Content || "").split(',').map(t => `<span style="background:rgba(99,102,241,0.1); color:var(--primary); padding:4px 10px; border-radius:8px; font-size:0.7rem; margin-right:5px;">#${t.trim()}</span>`).join('');
+                    const tags = content.split(',').map(t => `<span style="background:rgba(99,102,241,0.1); color:var(--primary); padding:4px 10px; border-radius:8px; font-size:0.7rem; margin-right:5px;">#${t.trim()}</span>`).join('');
                     return `<div class="note-card card-SUMMARY" style="grid-column: 1/-1;"> <span class="cat-tag">AI Keywords</span> <div style="display:flex; flex-wrap:wrap; gap:5px;">${tags}</div> </div>`;
                 }
                 return `
                     <div class="note-card card-${cat}">
                         <span class="cat-tag">${cat}</span>
-                        <div class="note-content">${n.Content}</div>
-                        <div class="note-footer"> <span>📂 ${n.Source}</span> <span>🗓️ ${(n.CreatedAt || "").split(' ')[0]}</span> </div>
+                        <div class="note-content">${content}</div>
+                        <div class="note-footer"> 
+                            <span>📂 ${source} <b style="color:var(--primary);">(Sayfa: ${page})</b></span> 
+                            <span>🗓️ ${date.split(' ')[0]}</span> 
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -289,8 +323,8 @@
             const lang = document.getElementById('langSelect').value;
             if(!files.length) return;
 
-            // 🛡️ 1. KADEME: FİZİKSEL SINIR (Maksimum 2 MB)
-            const MAX_MB = 2;
+            // Maksimum limiti backend dilimleme yapsa da 15MB'a çektik (Aşırı büyükleri önlemek için)
+            const MAX_MB = 15;
             const MAX_BYTES = MAX_MB * 1024 * 1024;
 
             for (let i = 0; i < files.length; i++) {
@@ -311,13 +345,12 @@
                 try { 
                     const res = await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); 
                     
-                    // 🛡️ 2. KADEME: YAPAY ZEKA TOKEN (KELİME) SINIRI KONTROLÜ
                     if (!res.ok) {
-                        alert(`⚠️ YAPAY ZEKA LİMİTİ: "${files[i].name}" çok fazla kelime (token) içeriyor!\n\nYapay zeka modeli bu kadar uzun bir metni tek seferde okuyamaz. Lütfen PDF'in sadece ilgili kısımlarını (örn: 5-10 sayfa) içeren bir dosya yükleyin.`);
+                        alert(`⚠️ YAPAY ZEKA LİMİTİ: "${files[i].name}" çok fazla kelime içeriyor veya sunucu hata verdi.\n\nLütfen daha az sayfa içeren bir dosya deneyin.`);
                         document.getElementById('pdfFile').value = '';
                         btn.innerHTML = "🚀 Analyze Files"; 
                         btn.disabled = false;
-                        return; // Hata alınca diğer dosyaları yüklemeyi durdur
+                        return;
                     }
                     successCount++;
                 } catch(e) {
@@ -327,11 +360,9 @@
             
             btn.innerHTML = "🚀 Analyze Files"; 
             btn.disabled = false;
-            document.getElementById('pdfFile').value = ''; // Yükleme bitince seçimi temizle
+            document.getElementById('pdfFile').value = '';
             
-            if(successCount > 0) {
-                fetchData(); // Sadece başarılı işlem varsa paneli güncelle
-            }
+            if(successCount > 0) fetchData();
         }
 
         function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }

@@ -1,9 +1,9 @@
 import os
 import json
-import fitz  # PyMuPDF
+import time
+import fitz
 import pytesseract
 from pdf2image import convert_from_path
-from PIL import Image
 from groq import Groq
 from dotenv import load_dotenv
 
@@ -12,51 +12,76 @@ load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-def extract_text_from_pdf(pdf_path):
-    text = ""
+def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5):
+    all_notes = []
     try:
         doc = fitz.open(pdf_path)
-        for page in doc:
-            page_text = page.get_text()
-            if page_text.strip():
-                text += page_text + "\n"
-            else:
-                print(f"Sayfa {page.number} taranıyor (OCR devrede)...")
-                images = convert_from_path(pdf_path, first_page=page.number+1, last_page=page.number+1)
-                for image in images:
-                    text += pytesseract.image_to_string(image) + "\n"
+        total_pages = len(doc)
+        print(f"\n📄 Toplam {total_pages} sayfa bulundu. {batch_size}'li paketler halinde işlenecek.")
+        
+        for i in range(0, total_pages, batch_size):
+            start_page = i
+            end_page = min(i + batch_size, total_pages)
+            
+            print(f"🔄 PAKET İŞLENİYOR: Sayfa {start_page + 1} - {end_page}")
+            
+            chunk_text = ""
+            for page_num in range(start_page, end_page):
+                page = doc[page_num]
+                page_text = page.get_text()
+                
+                # 📌 SAYFA İŞARETLEYİCİSİ GÜÇLENDİRİLDİ (Yapay Zeka atlamasın diye)
+                current_page_marker = f"\n\n[DİKKAT: AŞAĞIDAKİ METİNLER SAYFA {page_num + 1} İÇİNDİR]\n\n"
+                
+                if page_text.strip():
+                    chunk_text += current_page_marker + page_text
+                else:
+                    print(f"   📷 Sayfa {page_num + 1} fotoğraf olarak algılandı, OCR devrede...")
+                    images = convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1)
+                    for image in images:
+                        chunk_text += current_page_marker + pytesseract.image_to_string(image)
+            
+            if chunk_text.strip():
+                notes = analyze_with_groq(chunk_text, target_lang)
+                all_notes.extend(notes)
+                
+                if end_page < total_pages:
+                    print("⏳ API kotasını (Rate Limit) korumak için 15 saniye bekleniyor...\n")
+                    time.sleep(15)
+                    
     except Exception as e:
-        print(f"❌ PDF Okuma Hatası: {e}")
-    return text
+        print(f"❌ PDF Parçalama Hatası: {e}")
+        
+    return all_notes
 
 def analyze_with_groq(text, target_lang="auto"):
     if not text.strip():
         return []
         
-    print(f"\n🧠 GROQ NLP ANALİZİ BAŞLADI (Hedef Dil: {target_lang.upper()})...")
-    
     if target_lang == "tr":
-        lang_instruction = "JSON değerlerini ('summary', 'tags' ve 'Content' içlerini) KESİNLİKLE TÜRKÇE YAZ. Orijinal metin İngilizce olsa bile bu metinleri Türkçeye ÇEVİR."
+        lang_instruction = "TRANSLATE TO TURKISH: JSON değerlerini ('summary', 'tags' ve 'Content') KESİNLİKLE TÜRKÇE yaz."
     elif target_lang == "en":
-        lang_instruction = "JSON değerlerini ('summary', 'tags' ve 'Content' içlerini) KESİNLİKLE İNGİLİZCE YAZ. Orijinal metin Türkçe olsa bile bu metinleri İngilizceye ÇEVİR."
+        lang_instruction = "TRANSLATE TO STRICT ENGLISH: JSON değerlerini ('summary', 'tags' ve 'Content') KESİNLİKLE İNGİLİZCE yaz."
     else:
-        lang_instruction = "JSON değerlerini METNİN ORİJİNAL DİLİNDE YAZ. Çeviri yapma."
+        lang_instruction = "JSON değerlerini metnin ORİJİNAL DİLİNDE yaz."
 
     prompt = f"""
-    Sen uzman bir akademik veri bilimcisisin. Metni analiz et ve SADECE aşağıdaki JSON formatında tek bir çıktı üret.
+    Sen uzman bir akademik veri bilimcisisin. Metni analiz et ve SADECE JSON formatında çıktı üret.
     
     ÇOK ÖNEMLİ KURALLAR:
-    1. HEDEF DİL: {lang_instruction}
-    2. ATLAMAK YASAK (NO SKIPPING): Metindeki İSTİSNASIZ TÜM Tanım, Teorem ve Lemmaları bul! Sadece 1-2 tane bulup bırakmak YASAKTIR.
-    3. JSON KORUMASI: JSON anahtarları ve 'Category' DEĞERLERİ (Definition, Theorem, Lemma) KESİNLİKLE İNGİLİZCE KALMALIDIR! Çeviriyi SADECE 'summary', 'tags' ve 'Content' değerlerine uygula.
+    1. DİL HEDEFİ: {lang_instruction}
+    2. TEOREM KURALI: Sadece "Teorem 1.1:" veya "Tanım:" gibi açık ve resmi akademik kuralları al. 
+    3. BOŞ BIRAKMA HAKKI: Eğer sayfada gerçekten tanım, teorem veya lemma yoksa, uydurmak yerine 'notes' listesini KESİNLİKLE boş bırak ([]). 
+    4. SAYFA NUMARASI (PAGE): Metnin içinde "[DİKKAT: AŞAĞIDAKİ METİNLER SAYFA X İÇİNDİR]" şeklinde ibareler var. Bulduğun bilginin hemen ÜSTÜNDEKİ bu ibareye bak ve 'Page' anahtarına sadece RAKAM olarak yaz (Örn: "5").
+    5. KATEGORİ İSİMLERİ: 'Category' değerlerini çoğul YAZMA. Sadece şu üçünden birini tekil olarak yaz: "DEFINITION", "THEOREM", "LEMMA".
     
     ÖRNEK ÇIKTI FORMATI:
     {{
-        "summary": "Makalenin istenen dilde çevrilmiş genel özeti.",
+        "summary": "Makalenin bu kısmının özeti...",
         "tags": ["etiket1", "etiket2"],
         "notes": [
-            {{"Category": "Definition", "Content": "Bulunan 1. tanımın istenen dildeki çevirisi..."}},
-            {{"Category": "Theorem", "Content": "Bulunan 1. teoremin istenen dildeki çevirisi..."}}
+            {{"Category": "DEFINITION", "Content": "Bulunan 1. tanımın metni...", "Page": "3"}},
+            {{"Category": "LEMMA", "Content": "Gerçek lemma metni...", "Page": "5"}}
         ]
     }}
     
@@ -68,7 +93,8 @@ def analyze_with_groq(text, target_lang="auto"):
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1 
         )
         
         raw_response = completion.choices[0].message.content
@@ -83,16 +109,49 @@ def analyze_with_groq(text, target_lang="auto"):
         
         final_list = []
         if isinstance(data, dict):
-            if "summary" in data and data["summary"]:
+            if data.get("summary"):
                 final_list.append({"Category": "SUMMARY", "Content": data["summary"]})
-            if "tags" in data and data["tags"]:
-                final_list.append({"Category": "TAGS", "Content": ", ".join(data["tags"])})
-            if "notes" in data:
-                final_list.extend(data["notes"])
+            if data.get("tags"):
+                tags_content = data["tags"]
+                if isinstance(tags_content, list):
+                    tags_content = ", ".join(tags_content)
+                final_list.append({"Category": "TAGS", "Content": tags_content})
+            
+            raw_notes = data.get("notes", [])
+            for item in raw_notes:
+                cat = str(item.get("Category", item.get("category", ""))).strip().upper()
+                if "LEMMA" in cat: cat = "LEMMA"
+                elif "THEOREM" in cat: cat = "THEOREM"
+                elif "DEFINITION" in cat: cat = "DEFINITION"
+                
+                content = str(item.get("Content", item.get("content", ""))).strip()
+                page = str(item.get("Page", item.get("page", "-"))).strip()
+                
+                if cat and content:
+                    final_list.append({
+                        "Category": cat,
+                        "Content": content,
+                        "Page": page
+                    })
+                    
         elif isinstance(data, list):
-            final_list.extend(data)
+            for item in data:
+                cat = str(item.get("Category", item.get("category", ""))).strip().upper()
+                if "LEMMA" in cat: cat = "LEMMA"
+                elif "THEOREM" in cat: cat = "THEOREM"
+                elif "DEFINITION" in cat: cat = "DEFINITION"
+                
+                content = str(item.get("Content", item.get("content", ""))).strip()
+                page = str(item.get("Page", item.get("page", "-"))).strip()
+                
+                if cat and content:
+                    final_list.append({
+                        "Category": cat,
+                        "Content": content,
+                        "Page": page
+                    })
             
         return final_list
     except Exception as e:
-        print(f"❌ GROQ ANALİZ HATASI: {e}")
+        print(f"❌ GROQ HATASI: {e}")
         return []
