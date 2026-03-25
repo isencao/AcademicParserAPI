@@ -24,25 +24,25 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
 
-        /* GİRİŞ EKRANI */
+        /* GİRİŞ EKRANI VE ANİMASYONLAR */
         #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; transition: 0.5s; }
-        .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        
-        /* VS CODE UYARISI BURADA DÜZELTİLDİ */
-        .login-box h2 { 
-            font-size: 2rem; 
-            margin-bottom: 1rem; 
-            background: linear-gradient(to right, #818cf8, #c084fc); 
-            -webkit-background-clip: text; 
-            background-clip: text; 
-            -webkit-text-fill-color: transparent; 
-            color: transparent; /* Standart fallback */
-        }
-        
-        .login-box input { width: 100%; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: white; text-align: center; margin-bottom: 1.5rem; outline: none; transition: 0.3s; }
+        .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); transition: 0.3s; }
+        .login-box h2 { font-size: 2rem; margin-bottom: 1rem; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
+        .login-box input { width: 100%; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: white; text-align: center; margin-bottom: 1rem; outline: none; transition: 0.3s; }
         .login-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
         .login-box button { width: 100%; padding: 1rem; border-radius: 12px; border: none; background: linear-gradient(45deg, var(--primary), var(--secondary)); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .login-box button:hover { transform: translateY(-2px); opacity: 0.9; }
+        .login-box button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* HATA MESAJI VE TİTREME ANİMASYONU */
+        #loginError { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; display: none; font-weight: 600; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            50% { transform: translateX(10px); }
+            75% { transform: translateX(-10px); }
+        }
+        .shake-animation { animation: shake 0.4s ease-in-out; }
 
         /* SIDEBAR */
         .sidebar { width: 280px; background: var(--sidebar); padding: 2.5rem 1.5rem; border-right: 1px solid var(--border); position: fixed; height: 100vh; }
@@ -68,7 +68,6 @@
 
         /* DASHBOARD LAYOUT */
         .dashboard-grid { display: grid; grid-template-columns: 320px 1fr; gap: 2rem; }
-        
         .stats-panel { position: -webkit-sticky; position: sticky; top: 2.5rem; height: fit-content; }
         .chart-wrap { height: 250px; margin-top: 1.5rem; }
 
@@ -87,7 +86,6 @@
         .note-content { line-height: 1.6; font-size: 0.95rem; color: #cbd5e1; }
         .note-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
 
-        /* ÖZEL KART TİPLERİ */
         .card-THEOREM::before { background: var(--danger); }
         .card-LEMMA::before { background: var(--warning); }
         .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(168, 85, 247, 0.2); }
@@ -96,11 +94,12 @@
 </head>
 <body>
     <div id="loginOverlay">
-        <div class="login-box">
+        <div class="login-box" id="loginBox">
             <h2>PARSER<span>AI</span></h2>
             <p style="color: var(--text-muted); margin-bottom: 2rem;">Secure Academic Intelligence</p>
-            <input type="password" id="passInput" placeholder="Enter Access Key">
-            <button onclick="login()">Access Dashboard</button>
+            <input type="password" id="passInput" placeholder="Enter Access Key" onkeypress="if(event.key === 'Enter') login()">
+            <p id="loginError">❌ Invalid Access Key!</p>
+            <button id="loginBtn" onclick="login()">Access Dashboard</button>
         </div>
     </div>
 
@@ -134,10 +133,8 @@
                     <canvas id="statsChart"></canvas>
                 </div>
             </div>
-            
             <div class="content-area">
                 <input type="text" id="searchInput" class="search-box" style="width: 100%; margin-bottom: 1.5rem;" placeholder="Search within intelligence..." onkeyup="applyFilters()">
-                
                 <div class="filter-tabs">
                     <div class="tab active" onclick="setFilter('ALL', this)">All Nodes</div>
                     <div class="tab" onclick="setFilter('SUMMARY', this)">✨ AI Overviews</div>
@@ -145,14 +142,12 @@
                     <div class="tab" onclick="setFilter('THEOREM', this)">Theorems</div>
                     <div class="tab" onclick="setFilter('LEMMA', this)">Lemmas</div>
                 </div>
-
                 <div id="notesContainer" class="notes-grid"></div>
             </div>
         </div>
     </div>
 
     <script>
-        // API Adresini 127.0.0.1 yaparak Windows localhost karmaşasını da önledim
         const API_URL = 'http://127.0.0.1:8000/api';
         let myChart = null, allNotes = [], currentFilter = 'ALL';
         let currentApiKey = localStorage.getItem('api_key');
@@ -160,9 +155,43 @@
         if(!currentApiKey) { document.getElementById('loginOverlay').style.display = 'flex'; } 
         else { document.getElementById('loginOverlay').style.display = 'none'; fetchData(); }
 
-        function login() {
+        // YENİ VE GÜVENLİ LOGIN FONKSİYONU
+        async function login() {
             const pass = document.getElementById('passInput').value;
-            if(pass) { localStorage.setItem('api_key', pass); currentApiKey = pass; document.getElementById('loginOverlay').style.display = 'none'; fetchData(); }
+            const btn = document.getElementById('loginBtn');
+            const errorText = document.getElementById('loginError');
+            const box = document.getElementById('loginBox');
+
+            if(!pass) return;
+
+            btn.innerHTML = "Verifying...";
+            btn.disabled = true;
+            errorText.style.display = "none";
+
+            try {
+                // Şifreyi sunucuya soruyoruz (Ekrani gizlemeden önce!)
+                const res = await fetch(`${API_URL}/stats`, { headers: { 'X-API-Key': pass } });
+                
+                if(res.ok) {
+                    // Şifre doğruysa içeri al
+                    localStorage.setItem('api_key', pass); 
+                    currentApiKey = pass; 
+                    document.getElementById('loginOverlay').style.display = 'none'; 
+                    fetchData();
+                } else {
+                    // Şifre hatalıysa animasyon oynat ve hata ver
+                    errorText.style.display = "block";
+                    box.classList.remove("shake-animation");
+                    void box.offsetWidth; // Animasyonu sıfırlamak için DOM hilesi
+                    box.classList.add("shake-animation");
+                }
+            } catch (err) {
+                errorText.innerText = "❌ Sunucu bağlantı hatası!";
+                errorText.style.display = "block";
+            }
+
+            btn.innerHTML = "Access Dashboard";
+            btn.disabled = false;
         }
 
         function logout() { localStorage.removeItem('api_key'); location.reload(); }
@@ -170,6 +199,7 @@
         async function fetchWithAuth(url, options = {}) {
             options.headers = { ...options.headers, 'X-API-Key': currentApiKey };
             const res = await fetch(url, options);
+            // Eğer içerideyken şifre geçersiz olursa dışarı at
             if (res.status === 401) { logout(); throw new Error("Unauthorized"); }
             return res;
         }
@@ -215,7 +245,7 @@
                     <div class="note-card card-${cat}">
                         <span class="cat-tag">${cat}</span>
                         <div class="note-content">${n.Content}</div>
-                        <div class="note-footer"> <span>📂 ${n.Source}</span> <span>🗓️ ${n.CreatedAt.split(' ')[0]}</span> </div>
+                        <div class="note-footer"> <span>📂 ${n.Source}</span> <span>🗓️ ${(n.CreatedAt || "").split(' ')[0]}</span> </div>
                     </div>
                 `;
             }).join('');
@@ -259,15 +289,49 @@
             const lang = document.getElementById('langSelect').value;
             if(!files.length) return;
 
+            // 🛡️ 1. KADEME: FİZİKSEL SINIR (Maksimum 2 MB)
+            const MAX_MB = 2;
+            const MAX_BYTES = MAX_MB * 1024 * 1024;
+
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].size > MAX_BYTES) {
+                    alert(`❌ İŞLEM REDDEDİLDİ: "${files[i].name}" boyutu ${MAX_MB}MB sınırını aşıyor!\n\nLütfen PDF'i daha küçük parçalara bölüp yükleyin.`);
+                    document.getElementById('pdfFile').value = ''; 
+                    return; 
+                }
+            }
+
             btn.disabled = true;
+            let successCount = 0;
+
             for (let i = 0; i < files.length; i++) {
                 btn.innerHTML = `⏳ Analysing ${i+1}/${files.length}`;
                 const fd = new FormData();
                 fd.append('file', files[i]);
-                try { await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); } catch(e){}
+                try { 
+                    const res = await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); 
+                    
+                    // 🛡️ 2. KADEME: YAPAY ZEKA TOKEN (KELİME) SINIRI KONTROLÜ
+                    if (!res.ok) {
+                        alert(`⚠️ YAPAY ZEKA LİMİTİ: "${files[i].name}" çok fazla kelime (token) içeriyor!\n\nYapay zeka modeli bu kadar uzun bir metni tek seferde okuyamaz. Lütfen PDF'in sadece ilgili kısımlarını (örn: 5-10 sayfa) içeren bir dosya yükleyin.`);
+                        document.getElementById('pdfFile').value = '';
+                        btn.innerHTML = "🚀 Analyze Files"; 
+                        btn.disabled = false;
+                        return; // Hata alınca diğer dosyaları yüklemeyi durdur
+                    }
+                    successCount++;
+                } catch(e) {
+                    console.error("Yükleme hatası:", e);
+                }
             }
-            btn.innerHTML = "🚀 Analyze Files"; btn.disabled = false;
-            fetchData();
+            
+            btn.innerHTML = "🚀 Analyze Files"; 
+            btn.disabled = false;
+            document.getElementById('pdfFile').value = ''; // Yükleme bitince seçimi temizle
+            
+            if(successCount > 0) {
+                fetchData(); // Sadece başarılı işlem varsa paneli güncelle
+            }
         }
 
         function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }
