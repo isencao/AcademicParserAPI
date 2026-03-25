@@ -8,7 +8,7 @@ from pdf2image import convert_from_path
 from groq import Groq
 from dotenv import load_dotenv
 
-# 🗄️ Loglama Yapılandırması
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -34,16 +34,16 @@ def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_
             progress_dict[task_id]["message"] = msg
             progress_dict[task_id]["percent"] = percent
             progress_dict[task_id]["status"] = status
-            logger.info(f"[Görev: {task_id[:8]}] {percent}% - {msg}")
+            logger.info(f"[Task: {task_id[:8]}] {percent}% - {msg}")
 
     try:
-        update_progress("PDF okunuyor ve sayfalar analiz ediliyor...", 5)
+        update_progress("Reading PDF and analyzing pages...", 5)
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
         total_batches = (total_pages + batch_size - 1) // batch_size
         current_batch = 0
         
-        logger.info(f"📄 Toplam {total_pages} sayfa bulundu. {batch_size}'li paketler halinde işlenecek.")
+        logger.info(f"📄 Total {total_pages} pages found. Processing in batches of {batch_size}.")
         
         for i in range(0, total_pages, batch_size):
             start_page = i
@@ -51,35 +51,35 @@ def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_
             current_batch += 1
             
             base_percent = int((current_batch / total_batches) * 100)
-            update_progress(f"Paket {current_batch}/{total_batches} yapay zekaya gönderiliyor (Sayfa {start_page + 1}-{end_page})...", base_percent - 10)
+            update_progress(f"Sending batch {current_batch}/{total_batches} to AI (Pages {start_page + 1}-{end_page})...", base_percent - 10)
             
             chunk_text = ""
             for page_num in range(start_page, end_page):
                 page = doc[page_num]
                 page_text = page.get_text()
                 
-                current_page_marker = f"\n\n[DİKKAT: AŞAĞIDAKİ METİNLER SAYFA {page_num + 1} İÇİNDİR]\n\n"
+                current_page_marker = f"\n\n[ATTENTION: THE FOLLOWING TEXT IS FROM PAGE {page_num + 1}]\n\n"
                 
                 if page_text.strip():
                     chunk_text += current_page_marker + page_text
                 else:
-                    logger.warning(f"📷 Sayfa {page_num + 1} fotoğraf olarak algılandı, OCR devrede...")
+                    logger.warning(f"📷 Page {page_num + 1} detected as image, enabling OCR...")
                     images = convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1)
                     for image in images:
                         chunk_text += current_page_marker + pytesseract.image_to_string(image)
             
             if chunk_text.strip():
-                update_progress(f"Yapay zeka Sayfa {start_page + 1}-{end_page} arasını analiz ediyor...", base_percent - 5)
+                update_progress(f"AI analyzing pages {start_page + 1}-{end_page}...", base_percent - 5)
                 notes = analyze_with_groq(chunk_text, target_lang)
                 all_notes.extend(notes)
                 
                 if end_page < total_pages:
-                    update_progress("API kotası korunuyor. 15 saniye soğutma bekleniyor...", base_percent)
+                    update_progress("Protecting API limits. Cooling down for 15s...", base_percent)
                     time.sleep(15)
                     
-        update_progress("Analiz tamamlandı, veritabanına kaydediliyor!", 95)
+        update_progress("Analysis completed, saving to database!", 95)
     except Exception as e:
-        error_msg = f"Kritik PDF Parçalama Hatası: {str(e)}"
+        error_msg = f"Critical PDF Processing Error: {str(e)}"
         update_progress(error_msg, 0, "error")
         logger.error(error_msg, exc_info=True)
         
@@ -89,38 +89,38 @@ def analyze_with_groq(text, target_lang="auto"):
     if not text.strip():
         return []
         
-    # 🌍 DİL KOMUTU - ÇOK DAHA KATI VE NET
+    
     if target_lang == "tr":
-        lang_instruction = "ÇEVİRİ ZORUNLUDUR: JSON içindeki ('summary', 'tags' ve 'Content') değerlerini KESİNLİKLE TÜRKÇEYE ÇEVİRerek yaz. Orijinal metin İngilizce olsa bile doğrudan alıntı yapma, Türkçeye çevir."
+        lang_instruction = "TRANSLATION MANDATORY: Write JSON values ('summary', 'tags', and 'Content') STRICTLY IN TURKISH. Even if source is English, translate it to Turkish."
     elif target_lang == "en":
-        lang_instruction = "TRANSLATION IS MANDATORY: You MUST translate the extracted 'Content' and 'summary' into STRICT ENGLISH. Even if the original text is in Turkish, you must translate it to English. Do not leave any text in Turkish!"
+        lang_instruction = "TRANSLATION MANDATORY: Write JSON values ('summary', 'tags', and 'Content') STRICTLY IN ENGLISH. Even if source is Turkish, translate it to English. DO NOT leave Turkish text."
     else:
-        lang_instruction = "JSON değerlerini metnin ORİJİNAL DİLİNDE yaz."
+        lang_instruction = "Write JSON values in the ORIGINAL LANGUAGE of the text."
 
     prompt = f"""
-    Sen uzman bir akademik veri bilimcisisin. Metni analiz et ve SADECE JSON formatında çıktı üret.
+    You are an expert academic data scientist. Analyze the text and produce ONLY JSON format output.
     
-    ÇOK ÖNEMLİ KURALLAR:
-    1. DİL HEDEFİ: {lang_instruction}
-    2. TEOREM UYDURMAK YASAKTIR: 
-       - "Soru", "Görev", "Şekil", "Formül", "Adım" gibi kelimeler içeren sınav veya ödev yönergeleri KESİNLİKLE Teorem DEĞİLDİR!
-       - Sadece akademik olarak açıkça verilmiş gerçek Teorem, Tanım ve Lemmaları al. Uydurma.
-    3. BOŞ BIRAKMA HAKKI: Eğer sayfada gerçekten tanım, teorem veya lemma yoksa, uydurmak yerine 'notes' listesini KESİNLİKLE boş bırak ([]). 
-    4. SAYFA NUMARASI (PAGE): Metnin içinde "[DİKKAT: AŞAĞIDAKİ METİNLER SAYFA X İÇİNDİR]" şeklinde ibareler var. Bulduğun bilginin hemen ÜSTÜNDEKİ bu ibareye bak ve 'Page' anahtarına sadece RAKAM olarak yaz (Örn: "5").
-    5. KATEGORİ İSİMLERİ: 'Category' değerlerini çoğul YAZMA. Sadece şu üçünden birini tekil olarak yaz: "DEFINITION", "THEOREM", "LEMMA".
+    CRITICAL RULES:
+    1. TARGET LANGUAGE: {lang_instruction}
+    2. NO FAKE THEOREMS: 
+       - Exam instructions, homework questions, or phrases like "Question 1:", "Assignment:", "Task:" are NOT Theorems!
+       - Only extract formal academic Definitions, Theorems, and Lemmas.
+    3. EMPTY RESULTS: If no definition/theorem/lemma exists, leave the 'notes' list EMPTY []. Do not hallucinate.
+    4. PAGE NUMBERS: Check "[ATTENTION: THE FOLLOWING TEXT IS FROM PAGE X]" markers and write only the digit in the 'Page' field.
+    5. CATEGORY NAMES: Use ONLY "DEFINITION", "THEOREM", or "LEMMA". Singular form only.
     
-    ÖRNEK ÇIKTI FORMATI:
+    EXAMPLE OUTPUT FORMAT:
     {{
-        "summary": "Makalenin bu kısmının özeti...",
-        "tags": ["etiket1", "etiket2"],
+        "summary": "Summary of this section...",
+        "tags": ["tag1", "tag2"],
         "notes": [
-            {{"Category": "DEFINITION", "Content": "Bulunan 1. tanımın çevrilmiş metni...", "Page": "3"}},
-            {{"Category": "LEMMA", "Content": "Gerçek lemma metni...", "Page": "5"}}
+            {{"Category": "DEFINITION", "Content": "Translated definition text...", "Page": "3"}},
+            {{"Category": "THEOREM", "Content": "Translated theorem text...", "Page": "5"}}
         ]
     }}
     
-    Sadece geçerli JSON döndür. Başka hiçbir açıklama yazma.
-    Metin:
+    Return ONLY valid JSON. Do not add any extra text or explanation.
+    Text:
     {text}
     """
     
@@ -128,7 +128,7 @@ def analyze_with_groq(text, target_lang="auto"):
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0 # 🎯 HAYAL GÜCÜ TAMAMEN SIFIRLANDI (Uydurmayı kesmesi için)
+            temperature=0.0 
         )
         
         raw_response = completion.choices[0].message.content
@@ -164,62 +164,49 @@ def analyze_with_groq(text, target_lang="auto"):
                 if cat and content:
                     final_list.append({"Category": cat, "Content": content, "Page": page})
                     
-        elif isinstance(data, list):
-            for item in data:
-                cat = str(item.get("Category", item.get("category", ""))).strip().upper()
-                if "LEMMA" in cat: cat = "LEMMA"
-                elif "THEOREM" in cat: cat = "THEOREM"
-                elif "DEFINITION" in cat: cat = "DEFINITION"
-                
-                content = str(item.get("Content", item.get("content", ""))).strip()
-                page = str(item.get("Page", item.get("page", "-"))).strip()
-                
-                if cat and content:
-                    final_list.append({"Category": cat, "Content": content, "Page": page})
-            
         return final_list
     except Exception as e:
-        logger.error(f"GROQ Analiz Hatası: {str(e)}")
+        logger.error(f"GROQ Analysis Error: {str(e)}")
         return []
 
 def chat_with_notes(user_message: str, notes_list: list):
     if not notes_list:
-        return "Sistemde henüz çıkarılmış bir not bulunmuyor. Lütfen önce bir PDF analiz edin."
+        return "There are no notes extracted yet. Please process a PDF first."
 
     context_lines = []
     for n in notes_list:
-        cat = n.get("category", n.get("Category", "BİLGİ"))
+        cat = n.get("category", n.get("Category", "INFO"))
         page = n.get("page", n.get("Page", "-"))
         content = n.get("content", n.get("Content", ""))
-        context_lines.append(f"- [{cat.upper()}] (Sayfa {page}): {content}")
+        context_lines.append(f"- [{cat.upper()}] (Page {page}): {content}")
         
     context_text = "\n".join(context_lines)
 
     prompt = f"""
-    Sen uzman bir akademik asistansın. Aşağıda kullanıcının PDF'lerinden çıkarılmış akademik notlar (Teoremler, Tanımlar, Lemmalar) bulunmaktadır.
+    You are an expert academic assistant. Below are academic notes (Theorems, Definitions, Lemmas) extracted from documents.
     
-    KAYNAK NOTLAR:
+    SOURCE NOTES:
     {context_text}
     
-    KULLANICI SORUSU: {user_message}
+    USER QUESTION: {user_message}
     
-    KURALLAR:
-    1. SADECE yukarıdaki KAYNAK NOTLAR'ı kullanarak cevap ver. Kendi hafızandan bilgi ekleme.
-    2. Eğer sorunun cevabı notlarda yoksa, "Bu bilgi yüklediğiniz belgelerde bulunmamaktadır." de ve KESİNLİKLE uydurma.
-    3. Cevap verirken hangi sayfadan veya hangi belgeden alıntı yaptığını mutlaka belirt (Örn: "Sayfa 5'teki Tanıma göre...").
-    4. Dili profesyonel, akıcı ve Türkçe tut. Uzun uzun değil, net ve nokta atışı cevaplar ver.
+    RULES:
+    1. Answer ONLY using the SOURCE NOTES provided above. Do not use outside knowledge.
+    2. If the answer is not in the notes, say "This information is not found in the documents."
+    3. Always cite the page number or category when answering.
+    4. Keep the language professional and helpful.
     """
     
     try:
-        logger.info(f"Sohbet Asistanına soru soruldu: {user_message}")
+        logger.info(f"AI Assistant asked: {user_message}")
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2 
         )
         reply = completion.choices[0].message.content.strip()
-        logger.info("Sohbet Asistanı başarıyla yanıt verdi.")
+        logger.info("AI Assistant responded successfully.")
         return reply
     except Exception as e:
-        logger.error(f"SOHBET HATASI: {str(e)}", exc_info=True)
-        return "Yapay zeka ile iletişim kurulurken bir hata oluştu."
+        logger.error(f"CHAT ERROR: {str(e)}", exc_info=True)
+        return "An error occurred while communicating with the AI assistant."

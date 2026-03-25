@@ -9,7 +9,7 @@ import uuid
 import hashlib
 import logging
 
-# 🗄️ Merkez Loglama Yapılandırması
+# Global Logging Configuration
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -38,6 +38,7 @@ progress_store = {}
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    # Health, export and progress endpoints are excluded from key check
     if "/api/health" in path or "/api/notes/export" in path or "/api/notes/progress" in path:
         return await call_next(request)
         
@@ -46,17 +47,17 @@ async def auth_middleware(request: Request, call_next):
         token = request.headers.get("X-API-Key")
         secret = os.getenv("DASHBOARD_PASS", "123456")
         if token != secret:
-            logger.warning(f"Yetkisiz giriş denemesi: İstemci hatalı şifre kullandı.")
-            return JSONResponse(status_code=401, content={"detail": "Yetkisiz Erişim!"})
+            logger.warning(f"Unauthorized access attempt: Client provided an invalid access key.")
+            return JSONResponse(status_code=401, content={"detail": "Unauthorized Access!"})
             
     return await call_next(request)
 
 @app.on_event("startup")
 def on_startup():
-    logger.info("🚀 Parser AI Enterprise Sunucusu Başlatılıyor...")
+    logger.info("🚀 Parser AI Enterprise Server is Starting...")
     init_db()
     os.makedirs("Uploads", exist_ok=True)
-    logger.info("✅ Veritabanı ve klasörler hazır.")
+    logger.info("✅ Database and upload directories are ready.")
 
 @app.get("/api/health")
 def health_check(): return {"status": "Engine is running smoothly!"}
@@ -69,9 +70,9 @@ def fetch_stats(): return get_stats()
 
 @app.delete("/api/notes/clear-all")
 def delete_all():
-    logger.info("⚠️ Kullanıcı 'Clear Vault' işlemi yaptı, tüm veritabanı temizleniyor.")
+    logger.info("⚠️ User triggered 'Clear Vault'. All records and cache are being wiped.")
     clear_database()
-    return {"message": "Tüm veriler temizlendi."}
+    return {"message": "All data has been cleared successfully."}
 
 def get_file_hash(filepath):
     hasher = hashlib.md5()
@@ -81,7 +82,7 @@ def get_file_hash(filepath):
     return hasher.hexdigest()
 
 def background_pdf_processor(temp_path: str, filename: str, target_lang: str, task_id: str, file_hash: str):
-    logger.info(f"Arka plan işlemi başlatıldı: {filename} (Görev: {task_id})")
+    logger.info(f"Background process started: {filename} (Task ID: {task_id})")
     try:
         notes = process_pdf_in_batches(temp_path, target_lang=target_lang, batch_size=5, progress_dict=progress_store, task_id=task_id)
         for note in notes:
@@ -95,13 +96,13 @@ def background_pdf_processor(temp_path: str, filename: str, target_lang: str, ta
         mark_file_processed(file_hash, filename)
         
         progress_store[task_id]["percent"] = 100
-        progress_store[task_id]["message"] = "İşlem başarıyla tamamlandı!"
+        progress_store[task_id]["message"] = "Processing completed successfully!"
         progress_store[task_id]["status"] = "completed"
-        logger.info(f"✅ Görev başarıyla tamamlandı: {filename}")
+        logger.info(f"✅ Task completed successfully: {filename}")
     except Exception as e:
         progress_store[task_id]["status"] = "error"
-        progress_store[task_id]["message"] = f"Kritik Hata: {str(e)}"
-        logger.error(f"❌ Görev sırasında hata ({filename}): {str(e)}", exc_info=True)
+        progress_store[task_id]["message"] = f"Critical Error: {str(e)}"
+        logger.error(f"❌ Error during task ({filename}): {str(e)}", exc_info=True)
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
@@ -114,32 +115,32 @@ async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # 🧬 DİL DUYARLI DNA OLUŞTURMA
+    # 🧬 LANGUAGE-AWARE DNA GENERATION (CACHE KEY)
     base_hash = get_file_hash(temp_path)
     lang_aware_hash = f"{base_hash}_{target_lang}"
     
-    logger.info(f"📥 Yeni dosya yüklendi: {file.filename} | Dil: {target_lang} | Hash: {lang_aware_hash}")
+    logger.info(f"📥 New file uploaded: {file.filename} | Target Language: {target_lang} | Hash: {lang_aware_hash}")
     
     if is_file_processed(lang_aware_hash):
-        logger.info(f"⚡ Dosya Cache'de bulundu, API'ye gidilmiyor: {file.filename} ({target_lang})")
+        logger.info(f"⚡ File found in cache. Skipping API calls: {file.filename} ({target_lang})")
         progress_store[task_id] = {
             "status": "completed", 
             "percent": 100, 
-            "message": f"⚡ Sistem bu dosyayı ({target_lang}) tanıdı! Önbellekten çekildi."
+            "message": f"⚡ System recognized this file ({target_lang})! Data retrieved from cache."
         }
         if os.path.exists(temp_path): os.remove(temp_path)
-        return {"message": "Cache'den yüklendi", "task_id": task_id}
+        return {"message": "Retrieved from cache", "task_id": task_id}
 
-    progress_store[task_id] = {"status": "starting", "percent": 0, "message": "Görev sıraya alındı..."}
-    # Arka plana lang_aware_hash gönderiliyor
+    progress_store[task_id] = {"status": "starting", "percent": 0, "message": "Task queued..."}
+    # Passing lang_aware_hash to background processor
     background_tasks.add_task(background_pdf_processor, temp_path, file.filename, target_lang, task_id, lang_aware_hash)
     
-    return {"message": "İşlem arka plana alındı", "task_id": task_id}
+    return {"message": "Processing moved to background", "task_id": task_id}
 
 @app.get("/api/notes/progress/{task_id}")
 def get_progress(task_id: str):
     if task_id not in progress_store:
-        return JSONResponse(status_code=404, content={"detail": "Görev bulunamadı"})
+        return JSONResponse(status_code=404, content={"detail": "Task not found"})
     return progress_store[task_id]
 
 class ChatRequest(BaseModel):
@@ -153,7 +154,7 @@ async def chat_endpoint(request: ChatRequest):
 
 @app.get("/api/notes/export/csv")
 def export_csv_file():
-    logger.info("Kullanıcı verileri CSV olarak dışa aktardı.")
+    logger.info("User exported data as CSV.")
     notes = get_all_notes()
     file_path = "export.csv"
     with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -164,11 +165,11 @@ def export_csv_file():
     
 @app.get("/api/notes/export/md")
 def export_md_file():
-    logger.info("Kullanıcı verileri Markdown olarak dışa aktardı.")
+    logger.info("User exported data as Markdown.")
     notes = get_all_notes()
     file_path = "export.md"
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write("# Parser AI - Çıkarılan Notlar\n\n")
+        f.write("# Parser AI - Extracted Notes\n\n")
         for n in notes:
-            f.write(f"### {n.get('category', n.get('Category'))} (Sayfa: {n.get('page', n.get('Page', '-'))})\n{n.get('content', n.get('Content'))}\n*Kaynak: {n.get('source', n.get('Source'))}*\n\n---\n\n")
+            f.write(f"### {n.get('category', n.get('Category'))} (Page: {n.get('page', n.get('Page', '-'))})\n{n.get('content', n.get('Content'))}\n*Source: {n.get('source', n.get('Source'))}*\n\n---\n\n")
     return FileResponse(file_path, media_type="text/markdown", filename="academic_notes.md")

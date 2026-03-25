@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,7 +24,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
 
-        /* GİRİŞ EKRANI */
+        /* LOGIN SCREEN */
         #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; transition: 0.5s; }
         .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); transition: 0.3s; }
         .login-box h2 { font-size: 2rem; margin-bottom: 1rem; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
@@ -44,7 +44,7 @@
         .logout-btn { position: absolute; bottom: 2rem; left: 1.5rem; right: 1.5rem; padding: 0.8rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; cursor: pointer; transition: 0.3s; }
         .logout-btn:hover { background: var(--danger); color: white; }
 
-        /* ANA ALAN & KONTROLLER */
+        /* MAIN AREA & CONTROLS */
         .main { margin-left: 280px; flex-grow: 1; padding: 2.5rem; }
         .glass-panel { background: var(--card); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; }
         .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
@@ -66,7 +66,7 @@
         .tab:hover { background: rgba(255,255,255,0.1); }
         .tab.active { background: rgba(99, 102, 241, 0.15); color: var(--primary); border-color: rgba(99, 102, 241, 0.3); }
 
-        /* NOT KARTLARI */
+        /* NOTE CARDS */
         .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
         .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s; position: relative; overflow: hidden; }
         .note-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
@@ -79,7 +79,7 @@
         .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(168, 85, 247, 0.2); }
         .card-SUMMARY::before { background: var(--secondary); }
 
-        /* SOHBET (CHAT) WIDGET STİLLERİ */
+        /* CHAT WIDGET STYLES */
         .chat-widget { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
         .chat-toggle { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: 0.3s; display: flex; align-items: center; justify-content: center; }
         .chat-toggle:hover { transform: scale(1.1); }
@@ -130,7 +130,7 @@
             
             <div id="progressContainer" style="display: none; width: 100%; margin-top: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
                 <div id="progressBar" style="width: 0%; height: 6px; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.4s ease-in-out;"></div>
-                <div id="progressText" style="font-size: 0.8rem; color: var(--text-muted); padding: 8px 10px; font-weight: 600;">Motor başlatılıyor...</div>
+                <div id="progressText" style="font-size: 0.8rem; color: var(--text-muted); padding: 8px 10px; font-weight: 600;">Starting engine...</div>
             </div>
         </div>
         
@@ -158,15 +158,15 @@
     <div class="chat-widget">
         <div class="chat-panel" id="chatPanel">
             <div class="chat-header">
-                <span>🤖 Parser AI Asistan</span>
+                <span>🤖 Parser AI Assistant</span>
                 <button style="background:none; border:none; color:white; cursor:pointer;" onclick="toggleChat()">✖</button>
             </div>
             <div class="chat-body" id="chatBody">
-                <div class="chat-msg msg-ai">Merhaba! Yüklediğiniz belgelerdeki akademik notlarla ilgili bana soru sorabilirsiniz.</div>
+                <div class="chat-msg msg-ai">Hello! You can ask me questions regarding the academic notes in your uploaded documents.</div>
             </div>
             <div class="chat-input-area">
-                <input type="text" id="chatInput" placeholder="Örn: 2. Teoremi açıkla..." onkeypress="if(event.key === 'Enter') sendMessage()">
-                <button onclick="sendMessage()">Gönder</button>
+                <input type="text" id="chatInput" placeholder="e.g., Explain the 2nd Theorem..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()">Send</button>
             </div>
         </div>
         <button class="chat-toggle" onclick="toggleChat()">💬</button>
@@ -231,7 +231,7 @@
                     box.classList.add("shake-animation");
                 }
             } catch (err) {
-                errorText.innerText = "❌ Sunucu bağlantı hatası!";
+                errorText.innerText = "❌ Server connection error!";
                 errorText.style.display = "block";
             }
             btn.innerHTML = "Access Dashboard";
@@ -247,7 +247,7 @@
             return res;
         }
 
-        // VERİ ÇEKME VE FİLTRELEME
+        // DATA FETCHING AND FILTERING
         async function fetchData() {
             try {
                 const resNotes = await fetchWithAuth(`${API_URL}/notes`);
@@ -282,7 +282,7 @@
             container.innerHTML = notes.map(n => {
                 const cat = (n.category || n.Category || "DEFINITION").toUpperCase();
                 const content = n.content || n.Content || "";
-                const source = n.source || n.Source || "Bilinmiyor";
+                const source = n.source || n.Source || "Unknown";
                 const page = n.page || n.Page || "-";
                 const date = n.created_at || n.CreatedAt || "";
 
@@ -295,7 +295,7 @@
                         <span class="cat-tag">${cat}</span>
                         <div class="note-content">${content}</div>
                         <div class="note-footer"> 
-                            <span>📂 ${source} <b style="color:var(--primary);">(Sayfa: ${page})</b></span> 
+                            <span>📂 ${source} <b style="color:var(--primary);">(Page: ${page})</b></span> 
                             <span>🗓️ ${date.split(' ')[0]}</span> 
                         </div>
                     </div>
@@ -335,7 +335,7 @@
             });
         }
 
-        // DOSYA YÜKLEME VE İLERLEME TAKİBİ
+        // FILE UPLOAD AND PROGRESS TRACKING
         async function uploadPdf() {
             const files = document.getElementById('pdfFile').files;
             const btn = document.getElementById('uploadBtn');
@@ -347,7 +347,7 @@
 
             for (let i = 0; i < files.length; i++) {
                 if (files[i].size > MAX_BYTES) {
-                    alert(`❌ İŞLEM REDDEDİLDİ: "${files[i].name}" boyutu ${MAX_MB}MB sınırını aşıyor!`); 
+                    alert(`❌ UPLOAD REJECTED: "${files[i].name}" size exceeds the ${MAX_MB}MB limit!`); 
                     document.getElementById('pdfFile').value = ''; 
                     return; 
                 }
@@ -357,18 +357,18 @@
             document.getElementById('progressContainer').style.display = 'block';
 
             for (let i = 0; i < files.length; i++) {
-                btn.innerHTML = `⏳ Gönderiliyor ${i+1}/${files.length}`;
+                btn.innerHTML = `⏳ Uploading ${i+1}/${files.length}`;
                 const fd = new FormData();
                 fd.append('file', files[i]);
                 
                 try { 
                     const res = await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); 
-                    if (!res.ok) { alert("Yükleme reddedildi veya sunucu hatası."); continue; }
+                    if (!res.ok) { alert("Upload rejected or server error."); continue; }
                     
                     const data = await res.json();
                     await monitorProgress(data.task_id); 
                     
-                } catch(e) { console.error("Hata:", e); }
+                } catch(e) { console.error("Error:", e); }
             }
             
             btn.innerHTML = "🚀 Analyze Files"; 
@@ -411,7 +411,7 @@
         function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }
         async function clearAll() { if(confirm("Clear all intelligence?")) { await fetchWithAuth(`${API_URL}/notes/clear-all`, { method: 'DELETE' }); fetchData(); } }
 
-        // SOHBET (CHAT) FONKSİYONLARI
+        // CHAT FUNCTIONS
         function toggleChat() {
             const panel = document.getElementById('chatPanel');
             panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
@@ -428,7 +428,7 @@
             input.value = '';
             
             const typingId = "typing-" + Date.now();
-            chatBody.innerHTML += `<div id="${typingId}" class="chat-msg msg-ai" style="opacity: 0.7;">Düşünüyor... ⏳</div>`;
+            chatBody.innerHTML += `<div id="${typingId}" class="chat-msg msg-ai" style="opacity: 0.7;">Thinking... ⏳</div>`;
             chatBody.scrollTop = chatBody.scrollHeight;
 
             try {
@@ -447,7 +447,7 @@
                 
             } catch (err) {
                 document.getElementById(typingId).remove();
-                chatBody.innerHTML += `<div class="chat-msg msg-ai" style="color: var(--danger);">Bağlantı hatası oluştu.</div>`;
+                chatBody.innerHTML += `<div class="chat-msg msg-ai" style="color: var(--danger);">Connection error occurred.</div>`;
             }
         }
     </script>
