@@ -12,45 +12,62 @@ load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5):
+# services.py içindeki bu fonksiyonu güncelliyoruz:
+def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
     all_notes = []
+    
+    # 📡 İlerleme durumunu merkeze bildiren küçük telsizimiz
+    def update_progress(msg, percent, status="processing"):
+        if progress_dict is not None and task_id is not None:
+            if task_id not in progress_dict:
+                progress_dict[task_id] = {}
+            progress_dict[task_id]["message"] = msg
+            progress_dict[task_id]["percent"] = percent
+            progress_dict[task_id]["status"] = status
+            print(f"[{percent}%] {msg}")
+
     try:
+        update_progress("PDF okunuyor ve sayfalar analiz ediliyor...", 5)
         doc = fitz.open(pdf_path)
         total_pages = len(doc)
-        print(f"\n📄 Toplam {total_pages} sayfa bulundu. {batch_size}'li paketler halinde işlenecek.")
+        total_batches = (total_pages + batch_size - 1) // batch_size
+        current_batch = 0
         
         for i in range(0, total_pages, batch_size):
             start_page = i
             end_page = min(i + batch_size, total_pages)
+            current_batch += 1
             
-            print(f"🔄 PAKET İŞLENİYOR: Sayfa {start_page + 1} - {end_page}")
+            # Yüzde hesaplama
+            base_percent = int((current_batch / total_batches) * 100)
+            update_progress(f"Paket {current_batch}/{total_batches} yapay zekaya gönderiliyor (Sayfa {start_page + 1}-{end_page})...", base_percent - 10)
             
             chunk_text = ""
             for page_num in range(start_page, end_page):
                 page = doc[page_num]
                 page_text = page.get_text()
                 
-                # 📌 SAYFA İŞARETLEYİCİSİ GÜÇLENDİRİLDİ (Yapay Zeka atlamasın diye)
                 current_page_marker = f"\n\n[DİKKAT: AŞAĞIDAKİ METİNLER SAYFA {page_num + 1} İÇİNDİR]\n\n"
                 
                 if page_text.strip():
                     chunk_text += current_page_marker + page_text
                 else:
-                    print(f"   📷 Sayfa {page_num + 1} fotoğraf olarak algılandı, OCR devrede...")
                     images = convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1)
                     for image in images:
                         chunk_text += current_page_marker + pytesseract.image_to_string(image)
             
             if chunk_text.strip():
+                update_progress(f"Yapay zeka Sayfa {start_page + 1}-{end_page} arasını analiz ediyor...", base_percent - 5)
                 notes = analyze_with_groq(chunk_text, target_lang)
                 all_notes.extend(notes)
                 
                 if end_page < total_pages:
-                    print("⏳ API kotasını (Rate Limit) korumak için 15 saniye bekleniyor...\n")
+                    update_progress("API kotası korunuyor. 15 saniye soğutma bekleniyor...", base_percent)
                     time.sleep(15)
                     
+        update_progress("Analiz tamamlandı, veritabanına kaydediliyor!", 95)
     except Exception as e:
-        print(f"❌ PDF Parçalama Hatası: {e}")
+        update_progress(f"Hata: {str(e)}", 0, "error")
         
     return all_notes
 
