@@ -24,7 +24,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
 
-        /* GİRİŞ EKRANI VE ANİMASYONLAR */
+        /* GİRİŞ EKRANI */
         #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; transition: 0.5s; }
         .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); transition: 0.3s; }
         .login-box h2 { font-size: 2rem; margin-bottom: 1rem; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
@@ -32,16 +32,9 @@
         .login-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
         .login-box button { width: 100%; padding: 1rem; border-radius: 12px; border: none; background: linear-gradient(45deg, var(--primary), var(--secondary)); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .login-box button:hover { transform: translateY(-2px); opacity: 0.9; }
-        .login-box button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-        /* HATA MESAJI VE TİTREME ANİMASYONU */
         #loginError { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; display: none; font-weight: 600; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            50% { transform: translateX(10px); }
-            75% { transform: translateX(-10px); }
-        }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 50% { transform: translateX(10px); } 75% { transform: translateX(-10px); } }
         .shake-animation { animation: shake 0.4s ease-in-out; }
 
         /* SIDEBAR */
@@ -51,10 +44,8 @@
         .logout-btn { position: absolute; bottom: 2rem; left: 1.5rem; right: 1.5rem; padding: 0.8rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; cursor: pointer; transition: 0.3s; }
         .logout-btn:hover { background: var(--danger); color: white; }
 
-        /* ANA ALAN */
+        /* ANA ALAN & KONTROLLER */
         .main { margin-left: 280px; flex-grow: 1; padding: 2.5rem; }
-        
-        /* KONTROLLER */
         .glass-panel { background: var(--card); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; }
         .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
         
@@ -66,7 +57,6 @@
         
         select, .search-box { background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.7rem; border-radius: 10px; outline: none; }
 
-        /* DASHBOARD LAYOUT */
         .dashboard-grid { display: grid; grid-template-columns: 320px 1fr; gap: 2rem; }
         .stats-panel { position: -webkit-sticky; position: sticky; top: 2.5rem; height: fit-content; }
         .chart-wrap { height: 250px; margin-top: 1.5rem; }
@@ -78,18 +68,30 @@
 
         /* NOT KARTLARI */
         .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
-        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; overflow: hidden; }
+        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s; position: relative; overflow: hidden; }
         .note-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
         .note-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
-        
         .cat-tag { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 0.8rem; display: block; }
         .note-content { line-height: 1.6; font-size: 0.95rem; color: #cbd5e1; }
         .note-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
-
         .card-THEOREM::before { background: var(--danger); }
         .card-LEMMA::before { background: var(--warning); }
         .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(168, 85, 247, 0.2); }
         .card-SUMMARY::before { background: var(--secondary); }
+
+        /* SOHBET (CHAT) WIDGET STİLLERİ */
+        .chat-widget { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
+        .chat-toggle { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: 0.3s; display: flex; align-items: center; justify-content: center; }
+        .chat-toggle:hover { transform: scale(1.1); }
+        .chat-panel { display: none; position: absolute; bottom: 80px; right: 0; width: 350px; height: 450px; background: var(--sidebar); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); flex-direction: column; overflow: hidden; }
+        .chat-header { background: rgba(0,0,0,0.2); padding: 15px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .chat-msg { padding: 10px 15px; border-radius: 15px; max-width: 85%; font-size: 0.85rem; line-height: 1.4; }
+        .msg-user { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-ai { background: rgba(255,255,255,0.1); color: var(--text); align-self: flex-start; border-bottom-left-radius: 2px; }
+        .chat-input-area { display: flex; padding: 10px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        .chat-input-area input { flex-grow: 1; background: var(--bg); border: 1px solid var(--border); color: white; padding: 10px; border-radius: 10px; outline: none; }
+        .chat-input-area button { background: var(--primary); border: none; color: white; padding: 10px 15px; margin-left: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -153,6 +155,23 @@
         </div>
     </div>
 
+    <div class="chat-widget">
+        <div class="chat-panel" id="chatPanel">
+            <div class="chat-header">
+                <span>🤖 Parser AI Asistan</span>
+                <button style="background:none; border:none; color:white; cursor:pointer;" onclick="toggleChat()">✖</button>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="chat-msg msg-ai">Merhaba! Yüklediğiniz belgelerdeki akademik notlarla ilgili bana soru sorabilirsiniz.</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chatInput" placeholder="Örn: 2. Teoremi açıkla..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button onclick="sendMessage()">Gönder</button>
+            </div>
+        </div>
+        <button class="chat-toggle" onclick="toggleChat()">💬</button>
+    </div>
+
     <script>
         const API_URL = 'http://127.0.0.1:8000/api';
         let myChart = null, allNotes = [], currentFilter = 'ALL';
@@ -161,7 +180,7 @@
         if(!currentApiKey) { document.getElementById('loginOverlay').style.display = 'flex'; } 
         else { document.getElementById('loginOverlay').style.display = 'none'; fetchData(); }
 
-        // SUNUCU DURUMUNU (HEALTH CHECK) KONTROL EDEN FONKSİYON
+        // HEALTH CHECK
         async function checkEngineStatus() {
             const dot = document.getElementById('engineStatusDot');
             const text = document.getElementById('engineStatusText');
@@ -182,10 +201,10 @@
                 text.innerText = "Offline (Server Down)";
             }
         }
-
         checkEngineStatus();
         setInterval(checkEngineStatus, 5000);
 
+        // LOGIN / LOGOUT
         async function login() {
             const pass = document.getElementById('passInput').value;
             const btn = document.getElementById('loginBtn');
@@ -200,7 +219,6 @@
 
             try {
                 const res = await fetch(`${API_URL}/stats`, { headers: { 'X-API-Key': pass } });
-                
                 if(res.ok) {
                     localStorage.setItem('api_key', pass); 
                     currentApiKey = pass; 
@@ -216,7 +234,6 @@
                 errorText.innerText = "❌ Sunucu bağlantı hatası!";
                 errorText.style.display = "block";
             }
-
             btn.innerHTML = "Access Dashboard";
             btn.disabled = false;
         }
@@ -230,6 +247,7 @@
             return res;
         }
 
+        // VERİ ÇEKME VE FİLTRELEME
         async function fetchData() {
             try {
                 const resNotes = await fetchWithAuth(`${API_URL}/notes`);
@@ -317,7 +335,7 @@
             });
         }
 
-        // 🚀 GÜNCELLENMİŞ ARKA PLAN GÖREVİ (BACKGROUND TASKS) MİMARİSİ
+        // DOSYA YÜKLEME VE İLERLEME TAKİBİ
         async function uploadPdf() {
             const files = document.getElementById('pdfFile').files;
             const btn = document.getElementById('uploadBtn');
@@ -344,14 +362,10 @@
                 fd.append('file', files[i]);
                 
                 try { 
-                    // Dosyayı yolla ve biletini (task_id) al
                     const res = await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); 
-                    
                     if (!res.ok) { alert("Yükleme reddedildi veya sunucu hatası."); continue; }
                     
                     const data = await res.json();
-                    
-                    // Gişeyi beklemeye başla
                     await monitorProgress(data.task_id); 
                     
                 } catch(e) { console.error("Hata:", e); }
@@ -361,14 +375,12 @@
             btn.disabled = false;
             document.getElementById('pdfFile').value = '';
             
-            // İşlem bittikten 3 saniye sonra progress bar'ı gizle ve arayüzü yenile
             setTimeout(() => { 
                 document.getElementById('progressContainer').style.display = 'none'; 
                 fetchData();
             }, 3000);
         }
 
-        // 📡 GİŞE MEMURU: Arka plandaki işlemin yüzde kaçta olduğunu sorar
         async function monitorProgress(taskId) {
             return new Promise((resolve) => {
                 const bar = document.getElementById('progressBar');
@@ -392,12 +404,52 @@
                         clearInterval(interval); 
                         resolve(); 
                     }
-                }, 1500); // 1.5 saniyede bir kontrol et
+                }, 1500);
             });
         }
 
         function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }
         async function clearAll() { if(confirm("Clear all intelligence?")) { await fetchWithAuth(`${API_URL}/notes/clear-all`, { method: 'DELETE' }); fetchData(); } }
+
+        // SOHBET (CHAT) FONKSİYONLARI
+        function toggleChat() {
+            const panel = document.getElementById('chatPanel');
+            panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if(!message) return;
+
+            const chatBody = document.getElementById('chatBody');
+            
+            chatBody.innerHTML += `<div class="chat-msg msg-user">${message}</div>`;
+            input.value = '';
+            
+            const typingId = "typing-" + Date.now();
+            chatBody.innerHTML += `<div id="${typingId}" class="chat-msg msg-ai" style="opacity: 0.7;">Düşünüyor... ⏳</div>`;
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            try {
+                const res = await fetchWithAuth(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await res.json();
+                document.getElementById(typingId).remove();
+                
+                const formattedReply = data.reply.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+                chatBody.innerHTML += `<div class="chat-msg msg-ai">${formattedReply}</div>`;
+                chatBody.scrollTop = chatBody.scrollHeight;
+                
+            } catch (err) {
+                document.getElementById(typingId).remove();
+                chatBody.innerHTML += `<div class="chat-msg msg-ai" style="color: var(--danger);">Bağlantı hatası oluştu.</div>`;
+            }
+        }
     </script>
 </body>
 </html>

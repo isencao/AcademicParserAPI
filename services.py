@@ -172,3 +172,45 @@ def analyze_with_groq(text, target_lang="auto"):
     except Exception as e:
         print(f"❌ GROQ HATASI: {e}")
         return []
+    # services.py dosyasının en altına bu fonksiyonu ekle:
+
+def chat_with_notes(user_message: str, notes_list: list):
+    """Kullanıcının sorularını, sadece çıkardığı notlara bakarak cevaplar."""
+    if not notes_list:
+        return "Sistemde henüz çıkarılmış bir not bulunmuyor. Lütfen önce bir PDF analiz edin."
+
+    # Veritabanındaki notları yapay zekanın okuyabileceği bir metne dönüştürüyoruz
+    context_lines = []
+    for n in notes_list:
+        cat = n.get("category", n.get("Category", "BİLGİ"))
+        page = n.get("page", n.get("Page", "-"))
+        content = n.get("content", n.get("Content", ""))
+        context_lines.append(f"- [{cat.upper()}] (Sayfa {page}): {content}")
+        
+    context_text = "\n".join(context_lines)
+
+    prompt = f"""
+    Sen uzman bir akademik asistansın. Aşağıda kullanıcının PDF'lerinden çıkarılmış akademik notlar (Teoremler, Tanımlar, Lemmalar) bulunmaktadır.
+    
+    KAYNAK NOTLAR:
+    {context_text}
+    
+    KULLANICI SORUSU: {user_message}
+    
+    KURALLAR:
+    1. SADECE yukarıdaki KAYNAK NOTLAR'ı kullanarak cevap ver. Kendi hafızandan bilgi ekleme.
+    2. Eğer sorunun cevabı notlarda yoksa, "Bu bilgi yüklediğiniz belgelerde bulunmamaktadır." de ve KESİNLİKLE uydurma.
+    3. Cevap verirken hangi sayfadan veya hangi belgeden alıntı yaptığını mutlaka belirt (Örn: "Sayfa 5'teki Tanıma göre...").
+    4. Dili profesyonel, akıcı ve Türkçe tut. Uzun uzun değil, net ve nokta atışı cevaplar ver.
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile", # Yine o 70B'lik devasa ve zeki modeli kullanıyoruz
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2 # Sohbet olduğu için biraz daha doğal konuşması adına 0.2 yaptık
+        )
+        return completion.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"❌ SOHBET HATASI: {e}")
+        return "Yapay zeka ile iletişim kurulurken bir hata oluştu."

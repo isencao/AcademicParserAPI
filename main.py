@@ -5,8 +5,10 @@ import os
 import shutil
 import csv
 import uuid
-
-from database import init_db, save_note, get_all_notes, get_stats, clear_database
+import hashlib
+from pydantic import BaseModel
+from services import process_pdf_in_batches, chat_with_notes
+from database import init_db, save_note, get_all_notes, get_stats, clear_database, is_file_processed, mark_file_processed
 from services import process_pdf_in_batches
 
 app = FastAPI(title="Parser AI Enterprise API")
@@ -19,7 +21,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 📡 KÜRESEL İLERLEME DEPOSU (Hangi dosya yüzde kaçta?)
 progress_store = {}
 
 @app.middleware("http")
@@ -56,8 +57,15 @@ def delete_all():
     clear_database()
     return {"message": "Tüm veriler temizlendi."}
 
-# 🚀 YENİ: ARKA PLANDA ÇALIŞACAK MOTOR
-def background_pdf_processor(temp_path: str, filename: str, target_lang: str, task_id: str):
+# 🧬 YENİ: Dosyanın DNA'sını (MD5 Hash) hesaplayan fonksiyon
+def get_file_hash(filepath):
+    hasher = hashlib.md5()
+    with open(filepath, 'rb') as f:
+        buf = f.read()
+        hasher.update(buf)
+    return hasher.hexdigest()
+
+def background_pdf_processor(temp_path: str, filename: str, target_lang: str, task_id: str, file_hash: str):
     try:
         notes = process_pdf_in_batches(temp_path, target_lang=target_lang, batch_size=5, progress_dict=progress_store, task_id=task_id)
         for note in notes:
@@ -67,6 +75,10 @@ def background_pdf_processor(temp_path: str, filename: str, target_lang: str, ta
                 source=filename,
                 page=note.get("Page", "-")
             )
+            
+        # 🔐 YENİ: Başarıyla bitince dosyanın DNA'sını sisteme mühürle!
+        mark_file_processed(file_hash, filename)
+        
         progress_store[task_id]["percent"] = 100
         progress_store[task_id]["message"] = "İşlem başarıyla tamamlandı!"
         progress_store[task_id]["status"] = "completed"
@@ -76,7 +88,6 @@ def background_pdf_processor(temp_path: str, filename: str, target_lang: str, ta
     finally:
         if os.path.exists(temp_path): os.remove(temp_path)
 
-# 🎫 YENİ: SADECE BİLET KESİP İŞİ ARKAYA ATAN UPLOAD UCU
 @app.post("/api/notes/upload")
 async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(...), target_lang: str = "auto"):
     task_id = str(uuid.uuid4())
@@ -86,15 +97,25 @@ async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # Kasaya sıfır kilometre bir görev ekle
+    # 🧠 YENİ: Dosyanın DNA'sını (MD5) çıkar ve veritabanına sor
+    file_hash = get_file_hash(temp_path)
+    if is_file_processed(file_hash):
+        # 🚀 Zaten işlenmişse, Groq API'ye GİTME! İşlemi %100 yap ve kapat.
+        progress_store[task_id] = {
+            "status": "completed", 
+            "percent": 100, 
+            "message": "⚡ Sistem bu dosyayı tanıdı! Önbellekten (Cache) çekildi. (Sıfır API tüketimi)"
+        }
+        if os.path.exists(temp_path): os.remove(temp_path)
+        return {"message": "Cache'den yüklendi", "task_id": task_id}
+
     progress_store[task_id] = {"status": "starting", "percent": 0, "message": "Görev sıraya alındı..."}
     
-    # İşlemi arka plana fırlat ve kullanıcıyı hiç bekletme!
-    background_tasks.add_task(background_pdf_processor, temp_path, file.filename, target_lang, task_id)
+    # file_hash parametresini görev yöneticisine verdik
+    background_tasks.add_task(background_pdf_processor, temp_path, file.filename, target_lang, task_id, file_hash)
     
     return {"message": "İşlem arka plana alındı", "task_id": task_id}
 
-# 📡 YENİ: ARAYÜZÜN SÜREKLİ SORU SORACAĞI "DURUM" UCU
 @app.get("/api/notes/progress/{task_id}")
 def get_progress(task_id: str):
     if task_id not in progress_store:
@@ -120,3 +141,17 @@ def export_md_file():
         for n in notes:
             f.write(f"### {n.get('category', n.get('Category'))} (Sayfa: {n.get('page', n.get('Page', '-'))})\n{n.get('content', n.get('Content'))}\n*Kaynak: {n.get('source', n.get('Source'))}*\n\n---\n\n")
     return FileResponse(file_path, media_type="text/markdown", filename="academic_notes.md")
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    
+    all_notes = get_all_notes()
+    
+    
+    response_text = chat_with_notes(request.message, all_notes)
+    
+    return {"reply": response_text}
