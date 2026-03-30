@@ -29,6 +29,6 @@ echo "*.db"
 echo ".env" 
 
 export.csv
-
+export.md
 testpdf/
 app.log
