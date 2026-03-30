@@ -1,85 +1,97 @@
-# Parser AI - Enterprise Academic Intelligence
+🎓 Parser AI - Enterprise Academic Intelligence
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg)](https://fastapi.tiangolo.com/)
-[![Groq](https://img.shields.io/badge/AI-Groq_Llama_3.3_70B-f59e0b.svg)](https://groq.com/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg)](https://www.sqlite.org/)
-[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED.svg)](https://www.docker.com/)
+Parser AI is an enterprise-grade academic document analysis platform. It leverages advanced OCR, Large Language Models (LLMs), and modern software architecture to strictly extract Definitions, Lemmas, and Theorems from academic documents (PDF, TXT, MD) while ensuring zero hallucination.
 
-Parser AI is an enterprise-grade, local-first academic document analysis platform. It leverages advanced OCR, Large Language Models (LLMs), and modern software architecture principles to strictly extract Theorems, Definitions, and Lemmas from academic PDFs while completely eliminating AI hallucinations.
+🚀 Key Enterprise Features
 
-## 🚀 Key Enterprise Features
+Smart Language-Aware Caching: Implements an MD5 Hash-based caching system. Previously processed documents are retrieved from the local SQLite cache in <0.1s without redundant AI API calls.
 
-* **Clean Architecture & SOLID Principles:** Refactored using the **Repository Pattern** and **Dependency Injection**. The data access layer is completely decoupled from the business logic, ensuring maximum scalability and testability.
-* **Smart Language-Aware Caching:** Implements an MD5 Hash-based caching system (`file_hash_language`). If a previously processed file is uploaded, the system retrieves it from the local SQLite cache in `0.1s` without hitting the AI API, saving massive rate limits.
-* **Performance & Cost Analytics Pipeline:** Features a built-in telemetry system that logs processing time, total pages analyzed, and exact token consumption per document. Exportable to CSV for seamless integration with BI tools (like **Qlik** or PowerBI) for advanced dashboarding.
-* **Zero-Hallucination Extraction:** Utilizes a highly restricted `temperature=0.0` prompt architecture to ensure the AI only extracts genuine academic rules.
-* **RAG-Powered AI Assistant:** Chat directly with your documents. The built-in AI assistant uses Retrieval-Augmented Generation (RAG) to answer questions strictly based on your extracted database notes.
-* **Asynchronous Background Processing:** Employs FastAPI `BackgroundTasks` with a real-time polling mechanism to provide a live UI progress bar during heavy PDF OCR processing.
+Multi-Format Processing (Full Compliance): * Strict support for .txt and .md (paragraph-based segmentation as per Week 1 requirements).
 
-## 🏗️ System Architecture
+Advanced PDF parsing with Tesseract OCR fallback for scanned/image-based documents.
 
-* **Backend:** FastAPI (Python)
-* **Design Patterns:** Repository Pattern, Dependency Injection, Strategy (for OCR routing)
-* **AI Engine:** Groq API (`llama-3.3-70b-versatile`)
-* **Database:** SQLite3 (Notes, Smart Cache Tracking, Analytics Logging)
-* **Infrastructure:** Fully Dockerized for isolated, one-click deployments.
+Zero-Hallucination Extraction: Utilizes a highly restricted temperature=0.0 prompt architecture to ensure the AI only extracts genuine academic entities found in the source.
 
----
+Performance & Token Analytics: Built-in telemetry system that logs processing time, page counts, and exact token consumption. Data is exportable for cost and performance analysis.
 
-## 🐳 Getting Started (Docker Deployment - Recommended)
+RAG-Powered AI Assistant: Features a Retrieval-Augmented Generation (RAG) assistant that allows users to query the extracted database strictly based on the document context.
 
-The application is fully containerized, ensuring that all OS-level dependencies (like `tesseract-ocr` and `poppler-utils`) are perfectly isolated. 
+📋 Academic Compliance (Core Requirements)
 
-### Prerequisites
-* Docker & Docker Compose installed on your machine.
-* A Groq API Key.
+The system strictly adheres to the schema and logic defined in the project specifications:
 
-### 1-Click Installation
+Card Kinds: definition, lemma, theorem, example, question, note.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/isencao/AcademicParserAPI.git
-   cd AcademicParserAPI
-   ```
+Mandatory Fields: Every card includes card_id, doc_id, kind, title, body, anchors, and span_hint.
 
-2. **Environment Variables:**
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   DASHBOARD_PASS=123456
-   ```
+Card ID Logic: Generated using the doc_id_index_kind pattern for full traceability across the pipeline.
 
-3. **Spin up the Container:**
-   Run the following command to build the image and start the server:
-   ```
-   docker compose up -d --build
-   ```
+Official CSV Export: Exported cards_summary.csv strictly follows the required headers: card_id, doc_id, kind, title, span_hint.
 
-   If you prefer to run the project locally without Docker, ensure you have Python 3.10+, Tesseract-OCR, and Poppler-utils installed on your system.
+🏗️ System Architecture
 
-## 💻 Getting Started (Local Deployment)
+Backend: FastAPI (Python 3.10+)
 
-1. **Clone the repository:**
-   ```
-   git clone https://github.com/isencao/AcademicParserAPI.git
-   cd AcademicParserAPI
-   ```
-2. **Create a virtual environment and install dependencies:**
-   ```python -m venv venv
-   source venv/bin/activate  # On Windows use: venv\Scripts\activate
-   pip install -r requirements.txt
-   ```
+Design Patterns: Repository Pattern, Dependency Injection, Strategy (for OCR routing).
 
-3. **Environment Variables:**
-   Create a .env file in the root directory and add your secure keys:
-   ```
-   GROQ_API_KEY=your_groq_api_key_here
-   DASHBOARD_PASS=123456
-   ```
-4. **Run the Server:**
-   ```
-   python -m uvicorn main:app --reload
-   ```
+AI Engine: Groq API (llama-3.3-70b-versatile).
 
-   (Alternatively, if you are on Windows, you can simply run the start.bat file to launch the server.)
-  
+Database: SQLite3 (Note Repository, Cache Tracking, Analytics Logging).
+
+Infrastructure: Fully Dockerized for isolated, one-click deployments.
+
+🐳 Getting Started (Docker Deployment - Recommended)
+
+The application is fully containerized, ensuring that all OS-level dependencies (like tesseract-ocr and poppler-utils) are perfectly isolated.
+
+1-Click Installation
+
+Clone the repository:
+
+git clone [https://github.com/isencao/AcademicParserAPI.git](https://github.com/isencao/AcademicParserAPI.git)
+cd AcademicParserAPI
+
+
+Environment Variables:
+Create a .env file with your keys:
+
+GROQ_API_KEY=your_groq_api_key_here
+DASHBOARD_PASS=123456
+
+
+Spin up the Container:
+
+docker compose up -d --build
+
+
+💻 Getting Started (Local Deployment)
+
+Clone & Install Dependencies:
+
+git clone [https://github.com/isencao/AcademicParserAPI.git]
+cd AcademicParserAPI
+pip install -r requirements.txt
+
+
+Environment Variables:
+Create a .env file in the root directory:
+
+GROQ_API_KEY=your_groq_api_key_here
+DASHBOARD_PASS=123456
+
+
+Run the Server:
+
+python -m uvicorn main:app --reload
+
+
+(Alternatively, run the start.bat file if on Windows)
+
+🎯 Technical Presentation Highlights
+
+Rate Limit Protection: Implemented a 15-second cooldown between batches to protect API quotas.
+
+Traceability: Used real filenames as doc_id to ensure extracted notes remain linked to their original sources.
+
+Architecture: Demonstrating the use of Abstract Base Classes (ABC) for the Repository interface to ensure SOLID compliance and easy database swapping.
+

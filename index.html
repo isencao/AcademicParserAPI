@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parser AI | Nexus Dashboard</title>
+    <title>Academic Parser AI</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
@@ -25,131 +25,126 @@
         body { background: var(--bg); color: var(--text); display: flex; min-height: 100vh; overflow-x: hidden; }
 
         /* LOGIN SCREEN */
-        #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; transition: 0.5s; }
-        .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); transition: 0.3s; }
+        #loginOverlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .login-box { background: var(--sidebar); padding: 3rem; border-radius: 24px; text-align: center; width: 400px; border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
         .login-box h2 { font-size: 2rem; margin-bottom: 1rem; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
-        .login-box input { width: 100%; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: white; text-align: center; margin-bottom: 1rem; outline: none; transition: 0.3s; }
-        .login-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
-        .login-box button { width: 100%; padding: 1rem; border-radius: 12px; border: none; background: linear-gradient(45deg, var(--primary), var(--secondary)); color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .login-box button:hover { transform: translateY(-2px); opacity: 0.9; }
-
-        #loginError { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; display: none; font-weight: 600; }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 50% { transform: translateX(10px); } 75% { transform: translateX(-10px); } }
-        .shake-animation { animation: shake 0.4s ease-in-out; }
+        .login-box input { width: 100%; padding: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: white; text-align: center; margin-bottom: 1rem; outline: none; }
+        .login-box button { width: 100%; padding: 1rem; border-radius: 12px; border: none; background: linear-gradient(45deg, var(--primary), var(--secondary)); color: white; font-weight: bold; cursor: pointer; }
 
         /* SIDEBAR */
         .sidebar { width: 280px; background: var(--sidebar); padding: 2.5rem 1.5rem; border-right: 1px solid var(--border); position: fixed; height: 100vh; }
         .sidebar h2 { display: flex; align-items: center; gap: 10px; font-weight: 700; margin-bottom: 3rem; color: #fff; }
         .sidebar h2 span { color: var(--primary); }
-        .logout-btn { position: absolute; bottom: 2rem; left: 1.5rem; right: 1.5rem; padding: 0.8rem; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; cursor: pointer; transition: 0.3s; }
-        .logout-btn:hover { background: var(--danger); color: white; }
+        .sidebar-nav { color: var(--text-muted); font-size: 0.8rem; letter-spacing: 1px; margin-bottom: 1rem; }
 
-        /* MAIN AREA & CONTROLS */
+        /* MAIN AREA */
         .main { margin-left: 280px; flex-grow: 1; padding: 2.5rem; }
-        .glass-panel { background: var(--card); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; }
-        .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .glass-panel { background: var(--card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; }
         
+        .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
         .btn { padding: 0.7rem 1.2rem; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; transition: 0.3s; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: #4f46e5; transform: translateY(-1px); }
+        .btn-success { background: #0ea5e9; color: white; }
+        .btn-purple { background: #8b5cf6; color: white; }
         .btn-danger { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
-        .btn-danger:hover { background: var(--danger); color: white; }
-        
-        select, .search-box { background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.7rem; border-radius: 10px; outline: none; }
 
         .dashboard-grid { display: grid; grid-template-columns: 320px 1fr; gap: 2rem; }
-        .stats-panel { position: -webkit-sticky; position: sticky; top: 2.5rem; height: fit-content; }
         .chart-wrap { height: 250px; margin-top: 1.5rem; }
 
         .filter-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 5px; }
-        .tab { padding: 0.6rem 1.2rem; border-radius: 10px; background: rgba(255,255,255,0.05); color: var(--text-muted); cursor: pointer; transition: 0.3s; border: 1px solid transparent; white-space: nowrap; }
-        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab { padding: 0.6rem 1.2rem; border-radius: 10px; background: rgba(255,255,255,0.05); color: var(--text-muted); cursor: pointer; transition: 0.3s; white-space: nowrap; border: 1px solid transparent; }
         .tab.active { background: rgba(99, 102, 241, 0.15); color: var(--primary); border-color: rgba(99, 102, 241, 0.3); }
 
         /* NOTE CARDS */
         .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
-        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s; position: relative; overflow: hidden; }
-        .note-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
-        .note-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
-        .cat-tag { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 0.8rem; display: block; }
+        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s; position: relative; border-left: 4px solid var(--primary); }
+        .note-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); }
+        
+        .cat-tag { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 0.5rem; display: block; }
+        .note-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; }
         .note-content { line-height: 1.6; font-size: 0.95rem; color: #cbd5e1; }
+        
+        .note-anchors { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1rem; }
+        .anchor-badge { background: rgba(99,102,241,0.1); color: var(--primary); padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 600; }
+        
         .note-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
-        .card-THEOREM::before { background: var(--danger); }
-        .card-LEMMA::before { background: var(--warning); }
-        .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(168, 85, 247, 0.2); }
-        .card-SUMMARY::before { background: var(--secondary); }
+        
+        .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border-left-color: var(--secondary); }
+        .card-THEOREM { border-left-color: var(--danger); }
+        .card-LEMMA { border-left-color: var(--warning); }
 
-        /* CHAT WIDGET STYLES */
+        #progressContainer { width: 100%; margin-top: 1rem; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; display: none; }
+        #progressBar { width: 0%; height: 6px; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: 0.4s; }
+
+        /* CHAT */
         .chat-widget { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
-        .chat-toggle { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.5); transition: 0.3s; display: flex; align-items: center; justify-content: center; }
-        .chat-toggle:hover { transform: scale(1.1); }
-        .chat-panel { display: none; position: absolute; bottom: 80px; right: 0; width: 350px; height: 450px; background: var(--sidebar); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); flex-direction: column; overflow: hidden; }
-        .chat-header { background: rgba(0,0,0,0.2); padding: 15px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .chat-msg { padding: 10px 15px; border-radius: 15px; max-width: 85%; font-size: 0.85rem; line-height: 1.4; }
-        .msg-user { background: var(--primary); color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg-ai { background: rgba(255,255,255,0.1); color: var(--text); align-self: flex-start; border-bottom-left-radius: 2px; }
-        .chat-input-area { display: flex; padding: 10px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.2); }
-        .chat-input-area input { flex-grow: 1; background: var(--bg); border: 1px solid var(--border); color: white; padding: 10px; border-radius: 10px; outline: none; }
-        .chat-input-area button { background: var(--primary); border: none; color: white; padding: 10px 15px; margin-left: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .chat-toggle { background: var(--primary); color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 1.5rem; cursor: pointer; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .chat-panel { display: none; position: absolute; bottom: 80px; right: 0; width: 350px; height: 450px; background: var(--sidebar); border: 1px solid var(--border); border-radius: 20px; flex-direction: column; overflow: hidden; }
+        .chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; }
+        .msg-user { background: var(--primary); color: white; align-self: flex-end; padding: 10px; border-radius: 12px; border-bottom-right-radius: 2px; }
+        .msg-ai { background: rgba(255,255,255,0.1); color: var(--text); align-self: flex-start; padding: 10px; border-radius: 12px; border-bottom-left-radius: 2px; }
     </style>
 </head>
 <body>
     <div id="loginOverlay">
-        <div class="login-box" id="loginBox">
+        <div class="login-box">
             <h2>PARSER<span>AI</span></h2>
             <p style="color: var(--text-muted); margin-bottom: 2rem;">Secure Academic Intelligence</p>
-            <input type="password" id="passInput" placeholder="Enter Access Key" onkeypress="if(event.key === 'Enter') login()">
-            <p id="loginError">❌ Invalid Access Key!</p>
-            <button id="loginBtn" onclick="login()">Access Dashboard</button>
+            <input type="password" id="passInput" placeholder="Enter Access Key">
+            <button onclick="login()">Access Dashboard</button>
         </div>
     </div>
 
     <div class="sidebar">
         <h2>PARSER<span>AI</span></h2>
-        <div style="margin-top: 2rem; color: var(--text-muted); font-size: 0.8rem;">ENGINE STATUS</div>
-        <div id="engineStatusIndicator" style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.9rem; margin-top: 0.5rem; transition: 0.3s;">
-            <div id="engineStatusDot" style="width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; transition: 0.3s;"></div> 
-            <span id="engineStatusText">Checking...</span>
+        <div class="sidebar-nav">ENGINE STATUS</div>
+        <div id="statusIndicator" style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--text-muted);">
+            <div id="statusDot" style="width: 8px; height: 8px; border-radius: 50%; background: grey;"></div>
+            <span id="statusText">Checking...</span>
         </div>
-        <button class="logout-btn" onclick="logout()">Terminate Session</button>
+        <div style="margin-top: 2rem;" class="sidebar-nav">VERSION</div>
+        <div style="font-size: 0.9rem; color: var(--text-muted);">Final Enterprise v2.5</div>
+        <button class="btn btn-danger" style="position: absolute; bottom: 2rem; width: 80%;" onclick="logout()">Terminate Session</button>
     </div>
     
     <div class="main">
         <div class="glass-panel controls">
-            <input type="file" id="pdfFile" multiple style="color: var(--text-muted); font-size: 0.8rem;">
-            <select id="langSelect">
-                <option value="auto">🌍 Auto Detect</option>
-                <option value="tr">🇹🇷 Turkish</option>
-                <option value="en">🇬🇧 English</option>
+            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md" style="font-size: 0.8rem; color: var(--text-muted);">
+            <select id="langSelect" style="background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.5rem; border-radius: 8px;">
+                <option value="auto">Auto Detect</option>
+                <option value="tr">Turkish</option>
+                <option value="en">English</option>
             </select>
-            <button class="btn btn-primary" id="uploadBtn" onclick="uploadPdf()">🚀 Analyze Files</button>
+            <button class="btn btn-primary" onclick="uploadFiles()">🚀 Analyze</button>
             <div style="flex-grow: 1;"></div>
-            <button class="btn" style="background: #0ea5e9; color: white;" onclick="exportCsv()">Export Data</button>
-            <button class="btn btn-danger" onclick="clearAll()">Clear Vault</button>
+            <button class="btn btn-success" onclick="exportData('csv')">Export CSV</button>
+            <button class="btn btn-purple" onclick="exportData('md')">Export MD</button>
+            <button class="btn btn-danger" onclick="clearVault()">Clear Vault</button>
             
-            <div id="progressContainer" style="display: none; width: 100%; margin-top: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
-                <div id="progressBar" style="width: 0%; height: 6px; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.4s ease-in-out;"></div>
-                <div id="progressText" style="font-size: 0.8rem; color: var(--text-muted); padding: 8px 10px; font-weight: 600;">Starting engine...</div>
+            <div id="progressContainer">
+                <div id="progressBar"></div>
+                <div id="progressText" style="font-size: 0.7rem; color: var(--text-muted); padding: 5px 10px;">Ready</div>
             </div>
         </div>
         
         <div class="dashboard-grid">
             <div class="stats-panel glass-panel">
-                <h3 style="font-size: 1.1rem; font-weight: 700;">Insights</h3>
+                <h3 style="font-size: 1.1rem;">Distribution</h3>
                 <div class="chart-wrap">
                     <canvas id="statsChart"></canvas>
                 </div>
             </div>
             <div class="content-area">
-                <input type="text" id="searchInput" class="search-box" style="width: 100%; margin-bottom: 1.5rem;" placeholder="Search within intelligence..." onkeyup="applyFilters()">
-                <div class="filter-tabs">
+                <input type="text" id="searchInput" placeholder="Search within intelligence..." style="width: 100%; padding: 0.8rem; background: var(--bg); border: 1px solid var(--border); color: white; border-radius: 12px; margin-bottom: 1.5rem;" onkeyup="applyFilters()">
+                
+                <div class="filter-tabs" id="filterTabs">
                     <div class="tab active" onclick="setFilter('ALL', this)">All Nodes</div>
-                    <div class="tab" onclick="setFilter('SUMMARY', this)">✨ AI Overviews</div>
+                    <div class="tab" onclick="setFilter('SUMMARY', this)">AI Overviews</div>
                     <div class="tab" onclick="setFilter('DEFINITION', this)">Definitions</div>
                     <div class="tab" onclick="setFilter('THEOREM', this)">Theorems</div>
                     <div class="tab" onclick="setFilter('LEMMA', this)">Lemmas</div>
                 </div>
+                
                 <div id="notesContainer" class="notes-grid"></div>
             </div>
         </div>
@@ -157,16 +152,16 @@
 
     <div class="chat-widget">
         <div class="chat-panel" id="chatPanel">
-            <div class="chat-header">
-                <span>🤖 Parser AI Assistant</span>
-                <button style="background:none; border:none; color:white; cursor:pointer;" onclick="toggleChat()">✖</button>
+            <div style="padding: 15px; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border); font-weight: bold; display: flex; justify-content: space-between;">
+                <span>🤖 AI Assistant</span>
+                <button onclick="toggleChat()" style="background:none; border:none; color:white; cursor:pointer;">✖</button>
             </div>
             <div class="chat-body" id="chatBody">
-                <div class="chat-msg msg-ai">Hello! You can ask me questions regarding the academic notes in your uploaded documents.</div>
+                <div class="chat-msg msg-ai">System ready. Ask me about your documents.</div>
             </div>
-            <div class="chat-input-area">
-                <input type="text" id="chatInput" placeholder="e.g., Explain the 2nd Theorem..." onkeypress="if(event.key === 'Enter') sendMessage()">
-                <button onclick="sendMessage()">Send</button>
+            <div style="display:flex; padding:10px; border-top: 1px solid var(--border);">
+                <input type="text" id="chatInput" style="flex-grow:1; background:var(--bg); border:1px solid var(--border); color:white; padding:8px; border-radius:8px;" placeholder="Message AI..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()" style="margin-left:8px; background:var(--primary); color:white; border:none; border-radius:8px; padding:0 15px; cursor:pointer;">Send</button>
             </div>
         </div>
         <button class="chat-toggle" onclick="toggleChat()">💬</button>
@@ -174,281 +169,192 @@
 
     <script>
         const API_URL = 'http://127.0.0.1:8000/api';
-        let myChart = null, allNotes = [], currentFilter = 'ALL';
-        let currentApiKey = localStorage.getItem('api_key');
+        let allNotes = [], currentFilter = 'ALL', myChart = null;
+        let apiKey = localStorage.getItem('api_key');
 
-        if(!currentApiKey) { document.getElementById('loginOverlay').style.display = 'flex'; } 
-        else { document.getElementById('loginOverlay').style.display = 'none'; fetchData(); }
-
-        // HEALTH CHECK
-        async function checkEngineStatus() {
-            const dot = document.getElementById('engineStatusDot');
-            const text = document.getElementById('engineStatusText');
-            const indicator = document.getElementById('engineStatusIndicator');
-
-            try {
-                const res = await fetch(`${API_URL}/health`);
-                if (res.ok) {
-                    indicator.style.color = "var(--success)";
-                    dot.style.background = "var(--success)";
-                    dot.style.boxShadow = "0 0 10px var(--success)";
-                    text.innerText = "Ready (Online)";
-                }
-            } catch (error) {
-                indicator.style.color = "var(--danger)";
-                dot.style.background = "var(--danger)";
-                dot.style.boxShadow = "0 0 10px var(--danger)";
-                text.innerText = "Offline (Server Down)";
-            }
-        }
-        checkEngineStatus();
-        setInterval(checkEngineStatus, 5000);
-
-        // LOGIN / LOGOUT
-        async function login() {
-            const pass = document.getElementById('passInput').value;
-            const btn = document.getElementById('loginBtn');
-            const errorText = document.getElementById('loginError');
-            const box = document.getElementById('loginBox');
-
-            if(!pass) return;
-
-            btn.innerHTML = "Verifying...";
-            btn.disabled = true;
-            errorText.style.display = "none";
-
-            try {
-                const res = await fetch(`${API_URL}/stats`, { headers: { 'X-API-Key': pass } });
-                if(res.ok) {
-                    localStorage.setItem('api_key', pass); 
-                    currentApiKey = pass; 
-                    document.getElementById('loginOverlay').style.display = 'none'; 
-                    fetchData();
-                } else {
-                    errorText.style.display = "block";
-                    box.classList.remove("shake-animation");
-                    void box.offsetWidth;
-                    box.classList.add("shake-animation");
-                }
-            } catch (err) {
-                errorText.innerText = "❌ Server connection error!";
-                errorText.style.display = "block";
-            }
-            btn.innerHTML = "Access Dashboard";
-            btn.disabled = false;
+        if(apiKey) { 
+            document.getElementById('loginOverlay').style.display = 'none'; 
+            init(); 
         }
 
+        function login() {
+            const val = document.getElementById('passInput').value;
+            if(!val) return;
+            localStorage.setItem('api_key', val);
+            location.reload();
+        }
         function logout() { localStorage.removeItem('api_key'); location.reload(); }
 
-        async function fetchWithAuth(url, options = {}) {
-            options.headers = { ...options.headers, 'X-API-Key': currentApiKey };
-            const res = await fetch(url, options);
-            if (res.status === 401) { logout(); throw new Error("Unauthorized"); }
-            return res;
+        async function req(path, opt={}) {
+            opt.headers = {...opt.headers, 'X-API-Key': localStorage.getItem('api_key')};
+            const r = await fetch(`${API_URL}${path}`, opt);
+            if(r.status === 401) logout();
+            return r;
         }
 
-        // DATA FETCHING AND FILTERING
+        async function init() {
+            checkStatus();
+            setInterval(checkStatus, 10000);
+            fetchData();
+        }
+
+        async function checkStatus() {
+            try {
+                const r = await fetch(`${API_URL}/health`);
+                const dot = document.getElementById('statusDot');
+                const txt = document.getElementById('statusText');
+                if(r.ok) {
+                    dot.style.background = 'var(--success)';
+                    txt.innerText = 'Online';
+                }
+            } catch(e) {
+                document.getElementById('statusDot').style.background = 'var(--danger)';
+                document.getElementById('statusText').innerText = 'Offline';
+            }
+        }
+
         async function fetchData() {
             try {
-                const resNotes = await fetchWithAuth(`${API_URL}/notes`);
-                allNotes = await resNotes.json(); 
-                const resStats = await fetchWithAuth(`${API_URL}/stats`);
-                const stats = await resStats.json();
-                applyFilters(); renderChart(stats);
-            } catch (err) { console.error("Data error:", err); }
+                const [notesRes, statsRes] = await Promise.all([
+                    req('/notes'),
+                    req('/stats')
+                ]);
+                allNotes = await notesRes.json();
+                const stats = await statsRes.json();
+                renderChart(stats);
+                applyFilters();
+            } catch(e) { console.error("Load error", e); }
         }
 
-        function setFilter(category, btn) {
-            currentFilter = category;
+        function setFilter(cat, el) {
+            currentFilter = cat;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            btn.classList.add('active');
+            el.classList.add('active');
             applyFilters();
         }
 
         function applyFilters() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
+            const q = document.getElementById('searchInput').value.toLowerCase();
             const filtered = allNotes.filter(n => {
-                const cat = (n.category || n.Category || "").toUpperCase();
-                let matchCat = currentFilter === 'ALL' || (currentFilter === 'SUMMARY' && (cat === 'SUMMARY' || cat === 'TAGS')) || cat.includes(currentFilter);
-                return matchCat && JSON.stringify(n).toLowerCase().includes(search);
+                const cat = (n.kind || "").toUpperCase();
+                const matchCat = currentFilter === 'ALL' || cat.includes(currentFilter);
+                return matchCat && JSON.stringify(n).toLowerCase().includes(q);
             });
             renderNotes(filtered);
         }
 
         function renderNotes(notes) {
             const container = document.getElementById('notesContainer');
-            if(!notes.length) return container.innerHTML = `<div style="color: var(--text-muted); opacity: 0.5;">No intelligence found...</div>`;
+            if(!notes.length) return container.innerHTML = '<div style="grid-column:1/-1; text-align:center; opacity:0.5; padding:3rem;">No nodes found...</div>';
             
             container.innerHTML = notes.map(n => {
-                const cat = (n.category || n.Category || "DEFINITION").toUpperCase();
-                const content = n.content || n.Content || "";
-                const source = n.source || n.Source || "Unknown";
-                const page = n.page || n.Page || "-";
-                const date = n.created_at || n.CreatedAt || "";
+                const isSummary = n.kind === 'summary';
+                let anchorsHtml = "";
+                try {
+                    const arr = typeof n.anchors === 'string' ? JSON.parse(n.anchors) : n.anchors;
+                    if(Array.isArray(arr)) {
+                        anchorsHtml = `<div class="note-anchors">${arr.map(a => `<span class="anchor-badge">#${a}</span>`).join('')}</div>`;
+                    }
+                } catch(e) {}
 
-                if(cat === "TAGS") {
-                    const tags = content.split(',').map(t => `<span style="background:rgba(99,102,241,0.1); color:var(--primary); padding:4px 10px; border-radius:8px; font-size:0.7rem; margin-right:5px;">#${t.trim()}</span>`).join('');
-                    return `<div class="note-card card-SUMMARY" style="grid-column: 1/-1;"> <span class="cat-tag">AI Keywords</span> <div style="display:flex; flex-wrap:wrap; gap:5px;">${tags}</div> </div>`;
-                }
                 return `
-                    <div class="note-card card-${cat}">
-                        <span class="cat-tag">${cat}</span>
-                        <div class="note-content">${content}</div>
-                        <div class="note-footer"> 
-                            <span>📂 ${source} <b style="color:var(--primary);">(Page: ${page})</b></span> 
-                            <span>🗓️ ${date.split(' ')[0]}</span> 
-                        </div>
+                <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}">
+                    <span class="cat-tag">${n.kind}</span>
+                    <h3 class="note-title">${n.title || 'Untitled'}</h3>
+                    <div class="note-content">${n.body}</div>
+                    ${anchorsHtml}
+                    <div class="note-footer">
+                        <span>📄 ${n.doc_id || 'Unknown'}</span>
+                        <span style="color:var(--primary); font-weight:bold;">🔖 Page: ${n.span_hint || '-'}</span>
                     </div>
-                `;
+                </div>`;
             }).join('');
         }
 
-        function renderChart(stats) {
-            const canvas = document.getElementById('statsChart');
-            if(!canvas) return;
-            const ctx = canvas.getContext('2d');
-            if(myChart) myChart.destroy();
+        async function uploadFiles() {
+            const files = document.getElementById('fileInput').files;
+            if(!files.length) return;
             
-            const data = [
-                (stats.definition || stats.Definition || stats.DEFINITION || 0),
-                (stats.theorem || stats.Theorem || stats.THEOREM || 0),
-                (stats.lemma || stats.Lemma || stats.LEMMA || 0)
-            ];
+            const lang = document.getElementById('langSelect').value;
+            const container = document.getElementById('progressContainer');
+            const bar = document.getElementById('progressBar');
+            const txt = document.getElementById('progressText');
+            
+            container.style.display = 'block';
+            
+            for(let f of files) {
+                const fd = new FormData();
+                fd.append('file', f);
+                txt.innerText = `Uploading: ${f.name}`;
+                
+                try {
+                    const r = await req(`/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd });
+                    const data = await r.json();
+                    await poll(data.task_id, bar, txt);
+                } catch(e) { txt.innerText = "Error uploading file."; }
+            }
+            
+            setTimeout(() => { container.style.display = 'none'; fetchData(); }, 2000);
+        }
 
+        async function poll(id, bar, txt) {
+            return new Promise(resolve => {
+                const interval = setInterval(async () => {
+                    const r = await fetch(`${API_URL}/notes/progress/${id}`);
+                    const d = await r.json();
+                    bar.style.width = `${d.percent}%`;
+                    txt.innerText = d.message;
+                    if(d.status === 'completed' || d.status === 'error') {
+                        clearInterval(interval);
+                        resolve();
+                    }
+                }, 2000);
+            });
+        }
+
+        function renderChart(stats) {
+            const ctx = document.getElementById('statsChart').getContext('2d');
+            if(myChart) myChart.destroy();
+            const getVal = (k) => stats[k] || stats[k.toLowerCase()] || 0;
             myChart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Definitions', 'Theorems', 'Lemmas'],
                     datasets: [{
-                        data: data,
+                        data: [getVal('DEFINITION'), getVal('THEOREM'), getVal('LEMMA')],
                         backgroundColor: ['#6366f1', '#ef4444', '#f59e0b'],
-                        borderWidth: 0,
-                        hoverOffset: 20
+                        borderWidth: 0
                     }]
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '75%',
-                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20, usePointStyle: true } } }
-                }
+                options: { cutout: '80%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', usePointStyle: true } } } }
             });
         }
 
-        // FILE UPLOAD AND PROGRESS TRACKING
-        async function uploadPdf() {
-            const files = document.getElementById('pdfFile').files;
-            const btn = document.getElementById('uploadBtn');
-            const lang = document.getElementById('langSelect').value;
-            if(!files.length) return;
-
-            const MAX_MB = 15;
-            const MAX_BYTES = MAX_MB * 1024 * 1024;
-
-            for (let i = 0; i < files.length; i++) {
-                if (files[i].size > MAX_BYTES) {
-                    alert(`❌ UPLOAD REJECTED: "${files[i].name}" size exceeds the ${MAX_MB}MB limit!`); 
-                    document.getElementById('pdfFile').value = ''; 
-                    return; 
-                }
-            }
-
-            btn.disabled = true;
-            document.getElementById('progressContainer').style.display = 'block';
-
-            for (let i = 0; i < files.length; i++) {
-                btn.innerHTML = `⏳ Uploading ${i+1}/${files.length}`;
-                const fd = new FormData();
-                fd.append('file', files[i]);
-                
-                try { 
-                    const res = await fetchWithAuth(`${API_URL}/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd }); 
-                    if (!res.ok) { alert("Upload rejected or server error."); continue; }
-                    
-                    const data = await res.json();
-                    await monitorProgress(data.task_id); 
-                    
-                } catch(e) { console.error("Error:", e); }
-            }
-            
-            btn.innerHTML = "🚀 Analyze Files"; 
-            btn.disabled = false;
-            document.getElementById('pdfFile').value = '';
-            
-            setTimeout(() => { 
-                document.getElementById('progressContainer').style.display = 'none'; 
-                fetchData();
-            }, 3000);
-        }
-
-        async function monitorProgress(taskId) {
-            return new Promise((resolve) => {
-                const bar = document.getElementById('progressBar');
-                const txt = document.getElementById('progressText');
-                
-                const interval = setInterval(async () => {
-                    try {
-                        const res = await fetch(`${API_URL}/notes/progress/${taskId}`);
-                        if(!res.ok) return;
-                        
-                        const statusData = await res.json();
-                        
-                        bar.style.width = statusData.percent + '%';
-                        txt.innerText = statusData.message;
-                        
-                        if(statusData.status === 'completed' || statusData.status === 'error') {
-                            clearInterval(interval);
-                            resolve(); 
-                        }
-                    } catch(e) { 
-                        clearInterval(interval); 
-                        resolve(); 
-                    }
-                }, 1500);
-            });
-        }
-
-        function exportCsv() { window.location.href = `${API_URL}/notes/export/csv`; }
-        async function clearAll() { if(confirm("Clear all intelligence?")) { await fetchWithAuth(`${API_URL}/notes/clear-all`, { method: 'DELETE' }); fetchData(); } }
-
-        // CHAT FUNCTIONS
-        function toggleChat() {
-            const panel = document.getElementById('chatPanel');
-            panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+        function exportData(type) { window.location.href = `${API_URL}/notes/export/${type}`; }
+        async function clearVault() { if(confirm("Wipe all data?")) { await req('/notes/clear-all', {method:'DELETE'}); fetchData(); } }
+        
+        function toggleChat() { 
+            const p = document.getElementById('chatPanel');
+            p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
         }
 
         async function sendMessage() {
             const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if(!message) return;
-
-            const chatBody = document.getElementById('chatBody');
+            const msg = input.value.trim();
+            if(!msg) return;
             
-            chatBody.innerHTML += `<div class="chat-msg msg-user">${message}</div>`;
+            const body = document.getElementById('chatBody');
+            body.innerHTML += `<div class="msg-user">${msg}</div>`;
             input.value = '';
             
-            const typingId = "typing-" + Date.now();
-            chatBody.innerHTML += `<div id="${typingId}" class="chat-msg msg-ai" style="opacity: 0.7;">Thinking... ⏳</div>`;
-            chatBody.scrollTop = chatBody.scrollHeight;
-
-            try {
-                const res = await fetchWithAuth(`${API_URL}/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
-                });
-                
-                const data = await res.json();
-                document.getElementById(typingId).remove();
-                
-                const formattedReply = data.reply.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-                chatBody.innerHTML += `<div class="chat-msg msg-ai">${formattedReply}</div>`;
-                chatBody.scrollTop = chatBody.scrollHeight;
-                
-            } catch (err) {
-                document.getElementById(typingId).remove();
-                chatBody.innerHTML += `<div class="chat-msg msg-ai" style="color: var(--danger);">Connection error occurred.</div>`;
-            }
+            const r = await req('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message: msg})
+            });
+            const d = await r.json();
+            body.innerHTML += `<div class="msg-ai">${d.reply}</div>`;
+            body.scrollTop = body.scrollHeight;
         }
     </script>
 </body>

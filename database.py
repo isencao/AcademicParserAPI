@@ -1,14 +1,14 @@
 import sqlite3
+import json
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-
 
 class IDocumentRepository(ABC):
     @abstractmethod
     def init_db(self) -> None: pass
     
     @abstractmethod
-    def save_note(self, category: str, content: str, source: str, page: str = "-") -> None: pass
+    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str) -> None: pass
     
     @abstractmethod
     def get_all_notes(self) -> List[Dict[str, Any]]: pass
@@ -28,11 +28,8 @@ class IDocumentRepository(ABC):
     @abstractmethod
     def log_performance(self, filename: str, pages: int, process_time_sec: float, total_tokens: int) -> None: pass
 
-    # YENİ EKLENEN SÖZLEŞME
     @abstractmethod
     def get_analytics(self) -> List[Dict[str, Any]]: pass
-
-
 
 class SQLiteDocumentRepository(IDocumentRepository):
     def __init__(self, db_path: str = "academic_notes.db"):
@@ -47,13 +44,17 @@ class SQLiteDocumentRepository(IDocumentRepository):
     def init_db(self) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            # Final Şeması: Tüm akademik alanlar mevcut
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS notes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    category TEXT,
-                    content TEXT,
-                    source TEXT,
-                    page TEXT, 
+                    card_id TEXT,
+                    doc_id TEXT,
+                    kind TEXT,
+                    title TEXT,
+                    body TEXT,
+                    anchors TEXT,
+                    span_hint TEXT, 
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -76,12 +77,12 @@ class SQLiteDocumentRepository(IDocumentRepository):
             ''')
             conn.commit()
 
-    def save_note(self, category: str, content: str, source: str, page: str = "-") -> None:
+    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO notes (category, content, source, page) VALUES (?, ?, ?, ?)", 
-                (category, content, source, str(page))
+                "INSERT INTO notes (card_id, doc_id, kind, title, body, anchors, span_hint) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                (card_id, doc_id, kind, title, body, anchors, span_hint)
             )
             conn.commit()
 
@@ -95,9 +96,9 @@ class SQLiteDocumentRepository(IDocumentRepository):
     def get_stats(self) -> Dict[str, int]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT category, COUNT(*) as count FROM notes GROUP BY category")
+            cursor.execute("SELECT kind, COUNT(*) as count FROM notes GROUP BY kind")
             rows = cursor.fetchall()
-            return {row["category"]: row["count"] for row in rows}
+            return {row["kind"]: row["count"] for row in rows}
 
     def clear_database(self) -> None:
         with self._get_connection() as conn:
@@ -131,7 +132,6 @@ class SQLiteDocumentRepository(IDocumentRepository):
             )
             conn.commit()
 
-   
     def get_analytics(self) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()

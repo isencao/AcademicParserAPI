@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import re
 import fitz
 import pytesseract
 import logging
@@ -23,9 +24,92 @@ load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
-    all_notes = []
+def slugify(s: str) -> str:
+    s = s.lower().strip()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return re.sub(r"-{2,}", "-", s).strip("-")
+
+def analyze_with_groq(text, target_lang="auto"):
+    if not text.strip():
+        return [], 0
+        
+    if target_lang == "tr":
+        lang_instruction = "TRANSLATION MANDATORY: Write JSON values STRICTLY IN TURKISH. Even if source is English, translate it to Turkish."
+    elif target_lang == "en":
+        lang_instruction = "TRANSLATION MANDATORY: Write JSON values STRICTLY IN ENGLISH. Even if source is Turkish, translate it to English."
+    else:
+        lang_instruction = "Write JSON values in the ORIGINAL LANGUAGE of the text."
+
+    # HOCANIN İSTEDİĞİ YENİ ŞEMA FORMATI (card_id, anchors, span_hint vb.)
+# PROMPT GÜNCELLEMESİ: 'span_hint' için sadece rakam istiyoruz ve summary kuralını ekliyoruz
+    prompt = f"""
+    Analyze the text as an academic data scientist. produce ONLY JSON.
     
+    RULES:
+    1. TARGET LANGUAGE: {lang_instruction}
+    2. CARD KINDS: Identify 'definition', 'lemma', 'theorem', 'example', 'question', or 'note'.
+    3. ANCHORS: Extract 3-10 key tokens. Include LaTeX math symbols (e.g. $G$, $\alpha$) and academic terms.
+    4. SPAN_HINT: Write ONLY the page/paragraph number.
+    5. FIELDS:
+       - "summary": 2-3 sentence overview.
+       - "notes": Array of [kind, title, body, anchors, span_hint].
+    
+    Return ONLY valid JSON.
+    Text:
+    {text}
+    """
+    
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0 
+        )
+        
+        raw_response = completion.choices[0].message.content
+        used_tokens = completion.usage.total_tokens if completion.usage else 0
+        
+        clean_json = raw_response.strip()
+        
+        if clean_json.startswith("```json"):
+            clean_json = clean_json[7:-3].strip()
+        elif clean_json.startswith("```"):
+            clean_json = clean_json[3:-3].strip()
+            
+        data = json.loads(clean_json)
+        
+        extracted_notes = []
+        if isinstance(data, dict):
+            # 1. Summary (AI Overview) kartını en başa ekle
+            if data.get("summary"):
+                extracted_notes.append({
+                    "kind": "summary",
+                    "title": "Section Overview",
+                    "body": data["summary"],
+                    "anchors": ["ai-summary", "overview"],
+                    "span_hint": "General"
+                })
+            
+            # 2. Diğer notları listeye ekle
+            raw_notes = data.get("notes", [])
+            for n in raw_notes:
+                kind = str(n.get("kind", "note")).lower()
+                extracted_notes.append({
+                    "kind": kind,
+                    "title": n.get("title", "Untitled"),
+                    "body": n.get("body", ""),
+                    "anchors": n.get("anchors", []),
+                    "span_hint": n.get("span_hint", "-")
+                })
+                
+        return extracted_notes, used_tokens
+
+    except Exception as e:
+        logger.error(f"GROQ Analysis Error: {str(e)}")
+        return [], 0
+
+def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
+    all_notes = []
     total_tokens_used = 0 
     start_time = time.time() 
     total_pages = 0
@@ -40,162 +124,110 @@ def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_
             logger.info(f"[Task: {task_id[:8]}] {percent}% - {msg}")
 
     try:
-        update_progress("Reading PDF and analyzing pages...", 5)
-        doc = fitz.open(pdf_path)
-        total_pages = len(doc)
-        total_batches = (total_pages + batch_size - 1) // batch_size
-        current_batch = 0
+        update_progress("Reading file and analyzing structure...", 5)
+        doc_id = os.path.splitext(os.path.basename(filepath))[0]
         
-        logger.info(f"📄 Total {total_pages} pages found. Processing in batches of {batch_size}.")
-        
-        for i in range(0, total_pages, batch_size):
-            start_page = i
-            end_page = min(i + batch_size, total_pages)
-            current_batch += 1
+        # 1. BÖLÜM: TXT VE MD DOSYALARI (Hocanın ilk hafta MVP isteği)
+        if filepath.lower().endswith(('.txt', '.md')):
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
             
-            base_percent = int((current_batch / total_batches) * 100)
-            update_progress(f"Sending batch {current_batch}/{total_batches} to AI (Pages {start_page + 1}-{end_page})...", base_percent - 10)
+            # Boş satırlara göre paragraflara böl (Hocanın segment.py mantığı)
+            paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+            total_chunks = len(paragraphs)
+            total_pages = 1 # Metin dosyaları için sayfa 1 kabul edilir
             
-            chunk_text = ""
-            for page_num in range(start_page, end_page):
-                page = doc[page_num]
-                page_text = page.get_text()
-                
-                current_page_marker = f"\n\n[ATTENTION: THE FOLLOWING TEXT IS FROM PAGE {page_num + 1}]\n\n"
-                
-                if page_text.strip():
-                    chunk_text += current_page_marker + page_text
-                else:
-                    logger.warning(f"📷 Page {page_num + 1} detected as image, enabling OCR...")
-                    images = convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1)
-                    for image in images:
-                        chunk_text += current_page_marker + pytesseract.image_to_string(image)
+            logger.info(f"📄 Text file detected. Splitting into {total_chunks} paragraphs.")
             
-            if chunk_text.strip():
-                update_progress(f"AI analyzing pages {start_page + 1}-{end_page}...", base_percent - 5)
+            for i, para in enumerate(paragraphs):
+                base_percent = int((i / total_chunks) * 100)
+                update_progress(f"AI analyzing paragraph {i+1}/{total_chunks}...", base_percent)
                 
-                notes, batch_tokens = analyze_with_groq(chunk_text, target_lang)
-                all_notes.extend(notes)
+                marker = f"\n\n[ATTENTION: PARAGRAPH {i+1}]\n\n"
+                notes, batch_tokens = analyze_with_groq(marker + para, target_lang)
                 total_tokens_used += batch_tokens
                 
-                if end_page < total_pages:
-                    update_progress("Protecting API limits. Cooling down for 15s...", base_percent)
-                    time.sleep(15)
+                for idx, n in enumerate(notes):
+                    card_id = f"{doc_id}_{i:04d}_{slugify(n.get('kind', 'note'))}"
+                    n["card_id"] = card_id
+                    n["doc_id"] = doc_id
+                    all_notes.append(n)
                     
+        # 2. BÖLÜM: PDF DOSYALARI VE OCR DESTEĞİ (Senin Enterprise Çözümün)
+        else:
+            doc = fitz.open(filepath)
+            total_pages = len(doc)
+            total_batches = (total_pages + batch_size - 1) // batch_size
+            current_batch = 0
+            
+            logger.info(f"📄 Total {total_pages} PDF pages found. Processing in batches of {batch_size}.")
+            
+            for i in range(0, total_pages, batch_size):
+                start_page = i
+                end_page = min(i + batch_size, total_pages)
+                current_batch += 1
+                
+                base_percent = int((current_batch / total_batches) * 100)
+                update_progress(f"Sending batch {current_batch}/{total_batches} to AI (Pages {start_page + 1}-{end_page})...", base_percent - 10)
+                
+                chunk_text = ""
+                for page_num in range(start_page, end_page):
+                    page = doc[page_num]
+                    page_text = page.get_text()
+                    
+                    current_page_marker = f"\n\n[ATTENTION: PAGE {page_num + 1}]\n\n"
+                    
+                    if page_text.strip():
+                        chunk_text += current_page_marker + page_text
+                    else:
+                        # SENİN ORİJİNAL OCR (TESSERACT) YEDEK SİSTEMİN
+                        logger.warning(f"📷 Page {page_num + 1} detected as image, enabling OCR...")
+                        images = convert_from_path(filepath, first_page=page_num+1, last_page=page_num+1)
+                        for image in images:
+                            chunk_text += current_page_marker + pytesseract.image_to_string(image)
+                
+                if chunk_text.strip():
+                    update_progress(f"AI analyzing pages {start_page + 1}-{end_page}...", base_percent - 5)
+                    
+                    notes, batch_tokens = analyze_with_groq(chunk_text, target_lang)
+                    total_tokens_used += batch_tokens
+                    
+                    for idx, n in enumerate(notes):
+                        card_id = f"{doc_id}_{start_page+idx:04d}_{slugify(n.get('kind', 'note'))}"
+                        n["card_id"] = card_id
+                        n["doc_id"] = doc_id
+                        all_notes.append(n)
+                    
+                    if end_page < total_pages:
+                        update_progress("Protecting API limits. Cooling down for 15s...", base_percent)
+                        time.sleep(15)
+                        
         update_progress("Analysis completed, saving to database!", 95)
     except Exception as e:
-        error_msg = f"Critical PDF Processing Error: {str(e)}"
+        error_msg = f"Critical Processing Error: {str(e)}"
         update_progress(error_msg, 0, "error")
         logger.error(error_msg, exc_info=True)
         
-    
     process_time_sec = round(time.time() - start_time, 2)
-    logger.info(f"⏱️ PDF Processing Finished in {process_time_sec}s | Total Pages: {total_pages} | Total Tokens: {total_tokens_used}")
-    
+    logger.info(f"⏱️ Processing Finished in {process_time_sec}s | Total Tokens: {total_tokens_used}")
     
     return all_notes, total_pages, process_time_sec, total_tokens_used
 
-def analyze_with_groq(text, target_lang="auto"):
-    if not text.strip():
-        return [], 0
-        
-    if target_lang == "tr":
-        lang_instruction = "TRANSLATION MANDATORY: Write JSON values ('summary', 'tags', and 'Content') STRICTLY IN TURKISH. Even if source is English, translate it to Turkish."
-    elif target_lang == "en":
-        lang_instruction = "TRANSLATION MANDATORY: Write JSON values ('summary', 'tags', and 'Content') STRICTLY IN ENGLISH. Even if source is Turkish, translate it to English. DO NOT leave Turkish text."
-    else:
-        lang_instruction = "Write JSON values in the ORIGINAL LANGUAGE of the text."
-
-    prompt = f"""
-    You are an expert academic data scientist. Analyze the text and produce ONLY JSON format output.
-    
-    CRITICAL RULES:
-    1. TARGET LANGUAGE: {lang_instruction}
-    2. NO FAKE THEOREMS: 
-       - Exam instructions, homework questions, or phrases like "Question 1:", "Assignment:", "Task:" are NOT Theorems!
-       - Only extract formal academic Definitions, Theorems, and Lemmas.
-    3. EMPTY RESULTS: If no definition/theorem/lemma exists, leave the 'notes' list EMPTY []. Do not hallucinate.
-    4. PAGE NUMBERS: Check "[ATTENTION: THE FOLLOWING TEXT IS FROM PAGE X]" markers and write only the digit in the 'Page' field.
-    5. CATEGORY NAMES: Use ONLY "DEFINITION", "THEOREM", or "LEMMA". Singular form only.
-    
-    EXAMPLE OUTPUT FORMAT:
-    {{
-        "summary": "Summary of this section...",
-        "tags": ["tag1", "tag2"],
-        "notes": [
-            {{"Category": "DEFINITION", "Content": "Translated definition text...", "Page": "3"}},
-            {{"Category": "THEOREM", "Content": "Translated theorem text...", "Page": "5"}}
-        ]
-    }}
-    
-    Return ONLY valid JSON. Do not add any extra text or explanation.
-    Text:
-    {text}
-    """
-    
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0 
-        )
-        
-        raw_response = completion.choices[0].message.content
-        
-        used_tokens = completion.usage.total_tokens if completion.usage else 0
-        
-        clean_json = raw_response.strip()
-        
-        if clean_json.startswith("```json"):
-            clean_json = clean_json[7:-3].strip()
-        elif clean_json.startswith("```"):
-            clean_json = clean_json[3:-3].strip()
-            
-        data = json.loads(clean_json)
-        
-        final_list = []
-        if isinstance(data, dict):
-            if data.get("summary"):
-                final_list.append({"Category": "SUMMARY", "Content": data["summary"]})
-            if data.get("tags"):
-                tags_content = data["tags"]
-                if isinstance(tags_content, list):
-                    tags_content = ", ".join(tags_content)
-                final_list.append({"Category": "TAGS", "Content": tags_content})
-            
-            raw_notes = data.get("notes", [])
-            for item in raw_notes:
-                cat = str(item.get("Category", item.get("category", ""))).strip().upper()
-                if "LEMMA" in cat: cat = "LEMMA"
-                elif "THEOREM" in cat: cat = "THEOREM"
-                elif "DEFINITION" in cat: cat = "DEFINITION"
-                
-                content = str(item.get("Content", item.get("content", ""))).strip()
-                page = str(item.get("Page", item.get("page", "-"))).strip()
-                
-                if cat and content:
-                    final_list.append({"Category": cat, "Content": content, "Page": page})
-                    
-        return final_list, used_tokens
-    except Exception as e:
-        logger.error(f"GROQ Analysis Error: {str(e)}")
-        return [], 0
-
 def chat_with_notes(user_message: str, notes_list: list):
     if not notes_list:
-        return "There are no notes extracted yet. Please process a PDF first."
+        return "There are no notes extracted yet. Please process a document first."
 
     context_lines = []
     for n in notes_list:
-        cat = n.get("category", n.get("Category", "INFO"))
-        page = n.get("page", n.get("Page", "-"))
-        content = n.get("content", n.get("Content", ""))
-        context_lines.append(f"- [{cat.upper()}] (Page {page}): {content}")
+        kind = n.get("kind", n.get("Category", "INFO")).upper()
+        span = n.get("span_hint", n.get("Page", "-"))
+        body = n.get("body", n.get("Content", ""))
+        context_lines.append(f"- [{kind}] ({span}): {body}")
         
     context_text = "\n".join(context_lines)
 
     prompt = f"""
-    You are an expert academic assistant. Below are academic notes (Theorems, Definitions, Lemmas) extracted from documents.
+    You are an expert academic assistant. Below are academic notes (Theorems, Definitions, Lemmas, etc.) extracted from documents.
     
     SOURCE NOTES:
     {context_text}
@@ -205,7 +237,7 @@ def chat_with_notes(user_message: str, notes_list: list):
     RULES:
     1. Answer ONLY using the SOURCE NOTES provided above. Do not use outside knowledge.
     2. If the answer is not in the notes, say "This information is not found in the documents."
-    3. Always cite the page number or category when answering.
+    3. Always cite the span_hint (page number or paragraph) when answering.
     4. Keep the language professional and helpful.
     """
     
