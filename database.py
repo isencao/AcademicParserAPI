@@ -1,85 +1,143 @@
 import sqlite3
+from abc import ABC, abstractmethod
+from typing import List, Dict, Any
 
-def init_db():
-    """Initializes the database and creates required tables."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
+
+class IDocumentRepository(ABC):
+    @abstractmethod
+    def init_db(self) -> None: pass
     
-    # Primary table for academic notes
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT,
-            content TEXT,
-            source TEXT,
-            page TEXT, 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    @abstractmethod
+    def save_note(self, category: str, content: str, source: str, page: str = "-") -> None: pass
     
-    # Cache table for tracking processed files (to prevent duplicate API calls)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS processed_files (
-            file_hash TEXT PRIMARY KEY,
-            filename TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    @abstractmethod
+    def get_all_notes(self) -> List[Dict[str, Any]]: pass
     
-    conn.commit()
-    conn.close()
+    @abstractmethod
+    def get_stats(self) -> Dict[str, int]: pass
+    
+    @abstractmethod
+    def clear_database(self) -> None: pass
+    
+    @abstractmethod
+    def is_file_processed(self, file_hash: str) -> bool: pass
+    
+    @abstractmethod
+    def mark_file_processed(self, file_hash: str, filename: str) -> None: pass
 
-def save_note(category, content, source, page="-"):
-    """Inserts a new academic note into the database."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO notes (category, content, source, page) VALUES (?, ?, ?, ?)", 
-                   (category, content, source, str(page)))
-    conn.commit()
-    conn.close()
+    @abstractmethod
+    def log_performance(self, filename: str, pages: int, process_time_sec: float, total_tokens: int) -> None: pass
 
-def get_all_notes():
-    """Retrieves all notes from the database, ordered by ID descending."""
-    conn = sqlite3.connect("academic_notes.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM notes ORDER BY id DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    # YENİ EKLENEN SÖZLEŞME
+    @abstractmethod
+    def get_analytics(self) -> List[Dict[str, Any]]: pass
 
-def get_stats():
-    """Retrieves count statistics grouped by category."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT category, COUNT(*) as count FROM notes GROUP BY category")
-    rows = cursor.fetchall()
-    conn.close()
-    return {row[0]: row[1] for row in rows}
 
-def clear_database():
-    """Wipes all notes and cache data from the database."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM notes")
-    cursor.execute("DELETE FROM processed_files") 
-    conn.commit()
-    conn.close()
 
-#  SMART CACHE CONTROL FUNCTIONS
-def is_file_processed(file_hash):
-    """Checks if a file with the given hash has already been processed."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT filename FROM processed_files WHERE file_hash = ?", (file_hash,))
-    result = cursor.fetchone()
-    conn.close()
-    return result is not None
+class SQLiteDocumentRepository(IDocumentRepository):
+    def __init__(self, db_path: str = "academic_notes.db"):
+        self.db_path = db_path
+        self.init_db() 
 
-def mark_file_processed(file_hash, filename):
-    """Marks a file as processed by storing its hash in the database."""
-    conn = sqlite3.connect("academic_notes.db")
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO processed_files (file_hash, filename) VALUES (?, ?)", (file_hash, filename))
-    conn.commit()
-    conn.close()
+    def _get_connection(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def init_db(self) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category TEXT,
+                    content TEXT,
+                    source TEXT,
+                    page TEXT, 
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS processed_files (
+                    file_hash TEXT PRIMARY KEY,
+                    filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS analytics_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    filename TEXT,
+                    pages INTEGER,
+                    process_time_sec REAL,
+                    total_tokens INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            conn.commit()
+
+    def save_note(self, category: str, content: str, source: str, page: str = "-") -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO notes (category, content, source, page) VALUES (?, ?, ?, ?)", 
+                (category, content, source, str(page))
+            )
+            conn.commit()
+
+    def get_all_notes(self) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM notes ORDER BY id DESC")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_stats(self) -> Dict[str, int]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT category, COUNT(*) as count FROM notes GROUP BY category")
+            rows = cursor.fetchall()
+            return {row["category"]: row["count"] for row in rows}
+
+    def clear_database(self) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM notes")
+            cursor.execute("DELETE FROM processed_files") 
+            conn.commit()
+
+    def is_file_processed(self, file_hash: str) -> bool:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT filename FROM processed_files WHERE file_hash = ?", (file_hash,))
+            result = cursor.fetchone()
+            return result is not None
+
+    def mark_file_processed(self, file_hash: str, filename: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO processed_files (file_hash, filename) VALUES (?, ?)", 
+                (file_hash, filename)
+            )
+            conn.commit()
+
+    def log_performance(self, filename: str, pages: int, process_time_sec: float, total_tokens: int) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO analytics_log (filename, pages, process_time_sec, total_tokens) VALUES (?, ?, ?, ?)", 
+                (filename, pages, process_time_sec, total_tokens)
+            )
+            conn.commit()
+
+   
+    def get_analytics(self) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM analytics_log ORDER BY id DESC")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+def get_db_repository() -> IDocumentRepository:
+    return SQLiteDocumentRepository()

@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+venv/
+env/
+.git/
+.env
+academic_notes.db
+Uploads/
+app.log
+*.csv
+*.md

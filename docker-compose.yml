@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  parser-api:
+    build: .
+    container_name: parser_ai_enterprise
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./academic_notes.db:/app/academic_notes.db
+      - ./Uploads:/app/Uploads
+      - ./app.log:/app/app.log
+    env_file:
+      - .env
+    restart: unless-stopped

@@ -8,7 +8,6 @@ from pdf2image import convert_from_path
 from groq import Groq
 from dotenv import load_dotenv
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -26,6 +25,10 @@ client = Groq(api_key=api_key)
 
 def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
     all_notes = []
+    
+    total_tokens_used = 0 
+    start_time = time.time() 
+    total_pages = 0
     
     def update_progress(msg, percent, status="processing"):
         if progress_dict is not None and task_id is not None:
@@ -70,8 +73,10 @@ def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_
             
             if chunk_text.strip():
                 update_progress(f"AI analyzing pages {start_page + 1}-{end_page}...", base_percent - 5)
-                notes = analyze_with_groq(chunk_text, target_lang)
+                
+                notes, batch_tokens = analyze_with_groq(chunk_text, target_lang)
                 all_notes.extend(notes)
+                total_tokens_used += batch_tokens
                 
                 if end_page < total_pages:
                     update_progress("Protecting API limits. Cooling down for 15s...", base_percent)
@@ -83,13 +88,17 @@ def process_pdf_in_batches(pdf_path, target_lang="auto", batch_size=5, progress_
         update_progress(error_msg, 0, "error")
         logger.error(error_msg, exc_info=True)
         
-    return all_notes
+    
+    process_time_sec = round(time.time() - start_time, 2)
+    logger.info(f"⏱️ PDF Processing Finished in {process_time_sec}s | Total Pages: {total_pages} | Total Tokens: {total_tokens_used}")
+    
+    
+    return all_notes, total_pages, process_time_sec, total_tokens_used
 
 def analyze_with_groq(text, target_lang="auto"):
     if not text.strip():
-        return []
+        return [], 0
         
-    
     if target_lang == "tr":
         lang_instruction = "TRANSLATION MANDATORY: Write JSON values ('summary', 'tags', and 'Content') STRICTLY IN TURKISH. Even if source is English, translate it to Turkish."
     elif target_lang == "en":
@@ -132,6 +141,9 @@ def analyze_with_groq(text, target_lang="auto"):
         )
         
         raw_response = completion.choices[0].message.content
+        
+        used_tokens = completion.usage.total_tokens if completion.usage else 0
+        
         clean_json = raw_response.strip()
         
         if clean_json.startswith("```json"):
@@ -164,10 +176,10 @@ def analyze_with_groq(text, target_lang="auto"):
                 if cat and content:
                     final_list.append({"Category": cat, "Content": content, "Page": page})
                     
-        return final_list
+        return final_list, used_tokens
     except Exception as e:
         logger.error(f"GROQ Analysis Error: {str(e)}")
-        return []
+        return [], 0
 
 def chat_with_notes(user_message: str, notes_list: list):
     if not notes_list:
