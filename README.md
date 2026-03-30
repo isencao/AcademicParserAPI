@@ -60,10 +60,10 @@ The application is fully containerized, ensuring that all OS-level dependencies 
 ## 💻 Getting Started (Local Deployment)
 
 1. **Clone the repository:**
-```
+   ```
    git clone https://github.com/isencao/AcademicParserAPI.git
    cd AcademicParserAPI
-```
+   ```
 2. **Create a virtual environment and install dependencies:**
    ```python -m venv venv
    source venv/bin/activate  # On Windows use: venv\Scripts\activate
@@ -82,3 +82,4 @@ The application is fully containerized, ensuring that all OS-level dependencies 
    ```
 
    (Alternatively, if you are on Windows, you can simply run the start.bat file to launch the server.)
+  
