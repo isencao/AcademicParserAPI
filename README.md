@@ -72,9 +72,10 @@ The application is fully containerized, ensuring that all OS-level dependencies 
 
 3. **Environment Variables:**
    Create a .env file in the root directory and add your secure keys:
+   ```
    GROQ_API_KEY=your_groq_api_key_here
    DASHBOARD_PASS=123456
-
+   ```
 4. **Run the Server:**
    ```
    python -m uvicorn main:app --reload
