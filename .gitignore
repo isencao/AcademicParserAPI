@@ -30,5 +30,6 @@ echo ".env"
 
 export.csv
 export.md
+cards_summary.csv
 testpdf/
 app.log
