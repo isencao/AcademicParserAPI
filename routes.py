@@ -167,44 +167,93 @@ async def chat_endpoint(request: ChatRequest, db: IDocumentRepository = Depends(
 
 @router.get("/api/notes/export/csv")
 def export_csv_file(db: IDocumentRepository = Depends(get_db_repository)):
-    """Hocanın istediği cards_summary.csv çıktısını üretir."""
-    logger.info("User exported data as CSV.")
+    logger.info("User exported cards as CSV.")
     notes = db.get_all_notes()
+    relations = db.get_relations()
+
+    rel_map: dict[str, list[str]] = {}
+    for r in relations:
+        entry = f"{r['relation_type']}:{r['target_card_id']}"
+        rel_map.setdefault(r["source_card_id"], []).append(entry)
+
     file_path = "cards_summary.csv"
+    fields = ["card_id", "doc_id", "kind", "title", "body", "span_hint",
+              "tags", "anchors", "confidence", "extraction_method", "relations"]
     with open(file_path, "w", newline="", encoding="utf-8") as f:
-        # Hocanın beklediği 5 ana kolon
-        writer = csv.DictWriter(f, fieldnames=["card_id", "doc_id", "kind", "title", "span_hint"])
+        writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         for n in notes:
+            cid = n.get("card_id", "")
             writer.writerow({
-                "card_id": n.get("card_id"),
-                "doc_id": n.get("doc_id"),
-                "kind": n.get("kind"),
-                "title": n.get("title"),
-                "span_hint": n.get("span_hint")
+                "card_id":           cid,
+                "doc_id":            n.get("doc_id", ""),
+                "kind":              n.get("kind", ""),
+                "title":             n.get("title", ""),
+                "body":              (n.get("body", "") or "").replace("\n", " "),
+                "span_hint":         n.get("span_hint", ""),
+                "tags":              n.get("tags", "[]"),
+                "anchors":           n.get("anchors", "[]"),
+                "confidence":        n.get("confidence", ""),
+                "extraction_method": n.get("extraction_method", ""),
+                "relations":         " | ".join(rel_map.get(cid, [])),
             })
     return FileResponse(file_path, media_type="text/csv", filename="cards_summary.csv")
-    
+
 @router.get("/api/notes/export/md")
 def export_md_file(db: IDocumentRepository = Depends(get_db_repository)):
-    """Analiz sonuçlarını akademik Markdown raporu olarak sunar."""
-    logger.info("User exported data as Markdown.")
-    notes = db.get_all_notes()
+    logger.info("User exported cards as Markdown.")
+    notes    = db.get_all_notes()
+    relations = db.get_relations()
+
+    rel_map: dict[str, list[dict]] = {}
+    for r in relations:
+        rel_map.setdefault(r["source_card_id"], []).append(r)
+
+    card_titles = {n["card_id"]: n.get("title", n["card_id"]) for n in notes if n.get("card_id")}
+
     file_path = "export.md"
     with open(file_path, "w", encoding="utf-8") as f:
-        f.write("# 🎓 Academic Parser AI - Intelligence Report\n\n")
-        f.write(f"*Total Extracted Cards: {len(notes)}*\n\n---\n\n")
+        f.write("# Academic Parser AI — Knowledge Report\n\n")
+        f.write(f"*{len(notes)} cards extracted*\n\n---\n\n")
+
+        grouped: dict[str, list] = {}
         for n in notes:
-            kind = str(n.get('kind', 'note')).upper()
-            title = n.get('title', 'Untitled')
-            span = n.get('span_hint', '-')
-            body = n.get('body', '')
-            source = n.get('doc_id', 'Unknown')
-            
-            f.write(f"### {kind}: {title} (Page: {span})\n")
-            f.write(f"{body}\n\n")
-            f.write(f"*Source: {source}*\n\n---\n\n")
-            
+            grouped.setdefault(n.get("doc_id", "Unknown"), []).append(n)
+
+        for doc_id, doc_notes in grouped.items():
+            f.write(f"## Source: `{doc_id}`\n\n")
+            for n in doc_notes:
+                kind  = n.get("kind", "note").upper()
+                title = n.get("title", "Untitled")
+                span  = n.get("span_hint", "-")
+                body  = n.get("body", "")
+                conf  = n.get("confidence", "")
+                method = n.get("extraction_method", "")
+                cid   = n.get("card_id", "")
+
+                try:
+                    tags = json.loads(n.get("tags", "[]") or "[]")
+                    tags_str = " ".join(f"`#{t}`" for t in tags) if tags else "—"
+                except Exception:
+                    tags_str = "—"
+
+                f.write(f"### [{kind}] {title}\n\n")
+                f.write(f"{body}\n\n")
+                f.write(f"| Field | Value |\n|---|---|\n")
+                f.write(f"| Source | `{doc_id}` |\n")
+                f.write(f"| Page/Para | `{span}` |\n")
+                f.write(f"| Confidence | `{conf}` |\n")
+                f.write(f"| Method | `{method}` |\n")
+                f.write(f"| Tags | {tags_str} |\n")
+
+                rels = rel_map.get(cid, [])
+                if rels:
+                    f.write(f"\n**Relations:**\n")
+                    for r in rels:
+                        target_title = card_titles.get(r["target_card_id"], r["target_card_id"])
+                        f.write(f"- `{r['relation_type']}` → {target_title} *(by {r['created_by']})*\n")
+                f.write("\n---\n\n")
+
     return FileResponse(file_path, media_type="text/markdown", filename="academic_report.md")
 
 @router.post("/api/demo/load")
@@ -305,6 +354,11 @@ def auto_suggest(db: IDocumentRepository = Depends(get_db_repository)):
     for s in suggestions:
         db.add_relation(s["source_card_id"], s["target_card_id"], s["relation_type"], created_by="auto")
     return {"message": f"{len(suggestions)} relation(s) suggested.", "count": len(suggestions)}
+
+@router.get("/api/analytics")
+def get_analytics_json(db: IDocumentRepository = Depends(get_db_repository)):
+    """Performans verilerini JSON olarak döner."""
+    return db.get_analytics()
 
 @router.get("/api/analytics/export/csv")
 def export_analytics_csv(db: IDocumentRepository = Depends(get_db_repository)):

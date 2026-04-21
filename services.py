@@ -29,6 +29,88 @@ def slugify(s: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return re.sub(r"-{2,}", "-", s).strip("-")
 
+_KIND_LABELS = [
+    ("definition",  r"(?:definition|def\.?)"),
+    ("theorem",     r"(?:theorem|thm\.?)"),
+    ("lemma",       r"lemma"),
+    ("corollary",   r"corollary"),
+    ("example",     r"example"),
+    ("question",    r"(?:open\s+question|question|problem|open\s+problem)"),
+    ("note",        r"(?:note|remark|observation|corollary)"),
+    ("proof",       r"proof"),
+]
+
+# Matches: "**Definition (Graph):**", "Theorem 3.1:", "Lemma:", etc.
+_LABEL_RE = re.compile(
+    r"(?:\*\*|\b)"
+    r"(?P<kind>" + "|".join(r for _, r in _KIND_LABELS) + r")"
+    r"(?:\s+(?P<num>[\d\.]+))?"
+    r"(?:\s*\((?P<name>[^)]{1,80})\))?"
+    r"\s*[:\*]{1,3}",
+    re.IGNORECASE,
+)
+
+def rule_based_extract(text: str, span_hint: str = "-") -> list[dict]:
+    """Extract academic cards using regex patterns — no LLM required."""
+    results = []
+    paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+
+    for para in paragraphs:
+        m = _LABEL_RE.match(para)
+        if not m:
+            # Try anywhere in the first 120 chars
+            m = _LABEL_RE.search(para[:120])
+        if not m:
+            continue
+
+        raw_kind = m.group("kind").lower()
+        kind = next((k for k, r in _KIND_LABELS if re.match(r, raw_kind, re.I)), "note")
+        if kind == "proof":
+            continue  # skip proof blocks
+
+        name = m.group("name") or ""
+        num  = m.group("num")  or ""
+
+        # Build title
+        if name:
+            title = f"{kind.capitalize()} ({name})"
+        elif num:
+            title = f"{kind.capitalize()} {num}"
+        else:
+            # Grab the first meaningful phrase after the label (up to 60 chars)
+            after = para[m.end():].strip()
+            phrase = re.split(r"[\.;\n]", after)[0][:60].strip()
+            title = f"{kind.capitalize()}: {phrase}" if phrase else kind.capitalize()
+
+        body = para[m.end():].strip() if m.end() < len(para) else para
+
+        # Simple anchor extraction: capitalised terms and LaTeX tokens
+        anchors = list(dict.fromkeys(
+            re.findall(r"\$[^$]{1,30}\$", body) +
+            re.findall(r"\b[A-Z][a-z]{2,}\b", body)
+        ))[:8]
+
+        tags = [kind]
+        if any(w in body.lower() for w in ["proof", "we show", "it follows"]):
+            tags.append("proof")
+        if re.search(r"\$", body):
+            tags.append("formal")
+
+        results.append({
+            "kind": kind,
+            "title": title,
+            "body": body,
+            "anchors": anchors,
+            "tags": tags,
+            "span_hint": span_hint,
+            "confidence": 0.75 if name or num else 0.55,
+            "extraction_method": "rule_based",
+        })
+
+    logger.info(f"Rule-based extractor found {len(results)} cards.")
+    return results
+
+
 def analyze_with_groq(text, target_lang="auto"):
     if not text.strip():
         return [], 0
@@ -45,7 +127,12 @@ def analyze_with_groq(text, target_lang="auto"):
     prompt = f"""
 You are an academic knowledge extraction engine. Your job is to extract EVERY distinct academic concept from the text as a separate card.
 
-CRITICAL RULE: Extract ALL occurrences. If the text has 5 definitions, produce 5 definition cards. If it has 3 theorems, produce 3 theorem cards. Do NOT merge or skip. One concept = one card.
+CRITICAL RULES:
+1. Extract ALL occurrences. If the text has 5 definitions, produce 5 definition cards. Do NOT merge or skip. One concept = one card.
+2. Use ONLY these exact kind values: definition, theorem, lemma, example, question, note. NEVER use "open question", "open problem", "remark", "corollary", "proposition" — map them to the closest valid kind.
+3. Extract implicit cards too: if a concept is clearly defined/used without an explicit "Definition:" label, still extract it as a definition.
+4. Examples and worked instances MUST be extracted as separate "example" cards, not merged into theorems.
+5. Open problems, hardness results, and inapproximability questions → kind "question".
 
 CARD KINDS — use exactly these values:
 - "definition"  : introduces/defines a term or concept
@@ -95,7 +182,11 @@ TEXT:
             clean_json = clean_json[7:-3].strip()
         elif clean_json.startswith("```"):
             clean_json = clean_json[3:-3].strip()
-            
+
+        # Fix invalid JSON escape sequences from LaTeX (\sum, \frac, \mathbb etc.)
+        # Replace any \ not followed by a valid JSON escape char with \\
+        clean_json = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', clean_json)
+
         data = json.loads(clean_json)
         
         extracted_notes = []
@@ -114,9 +205,19 @@ TEXT:
                 })
             
             # 2. Diğer notları listeye ekle
+            _KIND_MAP = {
+                "open question": "question", "open problem": "question", "problem": "question",
+                "remark": "note", "observation": "note", "corollary": "note",
+                "claim": "lemma", "proposition": "theorem",
+            }
+            _VALID_KINDS = {"definition", "theorem", "lemma", "example", "question", "note", "summary"}
+
             raw_notes = data.get("notes", [])
             for n in raw_notes:
-                kind = str(n.get("kind", "note")).lower()
+                raw_kind = str(n.get("kind", "note")).lower().strip()
+                kind = _KIND_MAP.get(raw_kind, raw_kind)
+                if kind not in _VALID_KINDS:
+                    kind = "note"
                 try:
                     confidence = float(n.get("confidence", 1.0))
                     confidence = max(0.0, min(1.0, confidence))
@@ -136,8 +237,8 @@ TEXT:
         return extracted_notes, used_tokens
 
     except Exception as e:
-        logger.error(f"GROQ Analysis Error: {str(e)}")
-        return [], 0
+        logger.warning(f"GROQ unavailable ({e}), falling back to rule-based extraction.")
+        return rule_based_extract(text), 0
 
 def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
     all_notes = []
@@ -176,6 +277,11 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
                 
                 marker = f"\n\n[ATTENTION: PARAGRAPH {i+1}]\n\n"
                 notes, batch_tokens = analyze_with_groq(marker + para, target_lang)
+                # rule_based fallback already handled inside analyze_with_groq on exception
+                # tag paragraphs extracted via rule_based with correct span_hint
+                for n in notes:
+                    if n.get("extraction_method") == "rule_based":
+                        n["span_hint"] = f"para-{i+1}"
                 total_tokens_used += batch_tokens
                 
                 for idx, n in enumerate(notes):
