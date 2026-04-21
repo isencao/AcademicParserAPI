@@ -66,7 +66,7 @@ def background_processor(temp_path: str, filename: str, target_lang: str, task_i
                 extraction_method=note.get("extraction_method", "llm"),
             )
             
-        # Cache ve analitik kayıtları
+        
         db.mark_file_processed(file_hash, filename)
         db.log_performance(filename, total_pages, process_time_sec, total_tokens)
         
@@ -206,6 +206,78 @@ def export_md_file(db: IDocumentRepository = Depends(get_db_repository)):
             f.write(f"*Source: {source}*\n\n---\n\n")
             
     return FileResponse(file_path, media_type="text/markdown", filename="academic_report.md")
+
+@router.post("/api/demo/load")
+async def load_demo(background_tasks: BackgroundTasks, db: IDocumentRepository = Depends(get_db_repository)):
+    """eval/docs/ içindeki .md dosyalarını işleyip demo dataset oluşturur."""
+    docs_dir = os.path.join(os.path.dirname(__file__), "eval", "docs")
+    if not os.path.isdir(docs_dir):
+        raise HTTPException(status_code=404, detail="eval/docs/ directory not found.")
+
+    doc_files = [f for f in os.listdir(docs_dir) if f.endswith((".md", ".txt"))]
+    if not doc_files:
+        raise HTTPException(status_code=404, detail="No .md/.txt files found in eval/docs/.")
+
+    task_id = str(uuid.uuid4())
+    progress_store[task_id] = {"status": "starting", "percent": 0, "message": "Demo loading started..."}
+
+    def run_demo():
+        try:
+            total = len(doc_files)
+            all_notes = []
+            for i, fname in enumerate(sorted(doc_files)):
+                fpath = os.path.join(docs_dir, fname)
+                base_hash = hashlib.md5(open(fpath, "rb").read()).hexdigest()
+                lang_aware_hash = f"{base_hash}_auto_demo"
+
+                progress_store[task_id].update({
+                    "percent": int((i / total) * 80),
+                    "message": f"Processing {fname} ({i+1}/{total})...",
+                    "status": "processing",
+                })
+
+                if db.is_file_processed(lang_aware_hash):
+                    logger.info(f"Demo cache hit: {fname}")
+                    continue
+
+                notes, pages, t, tokens = process_file_in_batches(fpath, target_lang="en")
+                for note in notes:
+                    anchors_str = json.dumps(note.get("anchors", []))
+                    tags_str    = json.dumps(note.get("tags", []))
+                    db.save_note(
+                        card_id=note.get("card_id", uuid.uuid4().hex[:8]),
+                        doc_id=fname,
+                        kind=note.get("kind", "note"),
+                        title=note.get("title", "Untitled"),
+                        body=note.get("body", ""),
+                        anchors=anchors_str,
+                        span_hint=note.get("span_hint", "-"),
+                        tags=tags_str,
+                        confidence=note.get("confidence", 1.0),
+                        extraction_method=note.get("extraction_method", "llm"),
+                    )
+                    all_notes.append(note)
+                db.mark_file_processed(lang_aware_hash, fname)
+                db.log_performance(fname, pages, t, tokens)
+
+            progress_store[task_id].update({"percent": 85, "message": "Running auto-suggest relations..."})
+            full_notes = db.get_all_notes()
+            suggestions = auto_suggest_relations(full_notes)
+            db.clear_auto_relations()
+            for s in suggestions:
+                db.add_relation(s["source_card_id"], s["target_card_id"], s["relation_type"], created_by="auto")
+
+            progress_store[task_id].update({
+                "percent": 100,
+                "status": "completed",
+                "message": f"Demo ready: {len(full_notes)} cards, {len(suggestions)} relations.",
+            })
+        except Exception as e:
+            progress_store[task_id].update({"status": "error", "message": str(e)})
+            logger.error(f"Demo load error: {e}", exc_info=True)
+
+    background_tasks.add_task(run_demo)
+    return {"task_id": task_id, "message": "Demo loading started.", "files": doc_files}
 
 @router.get("/api/relations")
 def get_all_relations(card_id: str = None, db: IDocumentRepository = Depends(get_db_repository)):

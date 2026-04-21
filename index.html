@@ -137,6 +137,14 @@
         <div class="sidebar-link active" id="navDashboard" onclick="switchView('dashboard')">📊 Dashboard</div>
         <div class="sidebar-link" id="navEval" onclick="switchView('eval')">🔬 Evaluation</div>
         <div class="sidebar-link" id="navGraph" onclick="switchView('graph')">🕸️ Relations</div>
+        <div style="margin-top:2rem;" class="sidebar-nav">DEMO</div>
+        <button class="btn btn-primary" id="demoBtn" onclick="loadDemo()" style="width:100%;justify-content:center;">🎓 Load Demo Dataset</button>
+        <div id="demoProg" style="display:none;margin-top:0.8rem;">
+            <div style="background:rgba(0,0,0,0.3);border-radius:6px;overflow:hidden;height:4px;">
+                <div id="demoBar" style="height:4px;width:0%;background:linear-gradient(90deg,var(--primary),var(--secondary));transition:width 0.4s;"></div>
+            </div>
+            <div id="demoMsg" style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;"></div>
+        </div>
         <div style="margin-top: 2rem;" class="sidebar-nav">VERSION</div>
         <div style="font-size: 0.9rem; color: var(--text-muted);">Final Enterprise v2.5</div>
         <button class="btn btn-danger" style="position: absolute; bottom: 2rem; width: 80%;" onclick="logout()">Terminate Session</button>
@@ -460,6 +468,39 @@
         function exportData(type) { window.location.href = `${API_URL}/notes/export/${type}`; }
         async function clearVault() { if(confirm("Wipe all data?")) { await req('/notes/clear-all', {method:'DELETE'}); fetchData(); } }
         
+        // ── DEMO LOADER ──────────────────────────────────────────────────────
+        async function loadDemo() {
+            const btn = document.getElementById('demoBtn');
+            const prog = document.getElementById('demoProg');
+            const bar  = document.getElementById('demoBar');
+            const msg  = document.getElementById('demoMsg');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading...';
+            prog.style.display = 'block';
+
+            const r = await req('/demo/load', { method: 'POST' });
+            const d = await r.json();
+            if (!d.task_id) { btn.disabled = false; btn.textContent = '🎓 Load Demo Dataset'; return; }
+
+            await new Promise(resolve => {
+                const iv = setInterval(async () => {
+                    const p = await fetch(`${API_URL}/notes/progress/${d.task_id}`);
+                    const s = await p.json();
+                    bar.style.width = `${s.percent || 0}%`;
+                    msg.textContent = s.message || '';
+                    if (s.status === 'completed' || s.status === 'error') {
+                        clearInterval(iv);
+                        resolve();
+                    }
+                }, 2000);
+            });
+
+            btn.disabled = false;
+            btn.textContent = '🎓 Load Demo Dataset';
+            await fetchData();
+            switchView('graph');
+        }
         // ── VIEW SWITCHER ────────────────────────────────────────────────────
         const VIEWS = ['dashboard', 'eval', 'graph'];
         function switchView(view) {
