@@ -60,21 +60,47 @@
 
         /* NOTE CARDS */
         .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr)); gap: 1.5rem; }
-        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: 0.4s; position: relative; border-left: 4px solid var(--primary); }
-        .note-card:hover { transform: translateY(-5px); border-color: rgba(255,255,255,0.3); }
-        
-        .cat-tag { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 0.5rem; display: block; }
+        .note-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 20px; transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s; position: relative; border-left: 4px solid var(--primary); }
+        .note-card:hover { transform: translateY(-4px); }
+
+        .card-DEFINITION { border-left-color: #818cf8; }
+        .card-DEFINITION:hover { box-shadow: 0 12px 40px rgba(129,140,248,0.18); border-color: rgba(129,140,248,0.35); }
+        .card-THEOREM { border-left-color: #f87171; }
+        .card-THEOREM:hover { box-shadow: 0 12px 40px rgba(248,113,113,0.18); border-color: rgba(248,113,113,0.35); }
+        .card-LEMMA { border-left-color: #fbbf24; }
+        .card-LEMMA:hover { box-shadow: 0 12px 40px rgba(251,191,36,0.18); border-color: rgba(251,191,36,0.35); }
+        .card-EXAMPLE { border-left-color: #4ade80; }
+        .card-EXAMPLE:hover { box-shadow: 0 12px 40px rgba(74,222,128,0.18); border-color: rgba(74,222,128,0.35); }
+        .card-QUESTION { border-left-color: #c084fc; }
+        .card-QUESTION:hover { box-shadow: 0 12px 40px rgba(192,132,252,0.18); border-color: rgba(192,132,252,0.35); }
+        .card-NOTE { border-left-color: #94a3b8; }
+        .card-NOTE:hover { box-shadow: 0 12px 40px rgba(148,163,184,0.18); border-color: rgba(148,163,184,0.35); }
+        .card-SUMMARY { grid-column: 1 / -1; border-left-color: #38bdf8; background: linear-gradient(135deg, rgba(56,189,248,0.06), rgba(168,85,247,0.06)); }
+        .card-SUMMARY:hover { box-shadow: 0 12px 40px rgba(56,189,248,0.18); border-color: rgba(56,189,248,0.35); }
+
+        .cat-tag { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; display: block; }
         .note-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 1rem; }
         .note-content { line-height: 1.6; font-size: 0.95rem; color: #cbd5e1; }
-        
+
         .note-anchors { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 1rem; }
         .anchor-badge { background: rgba(99,102,241,0.1); color: var(--primary); padding: 3px 8px; border-radius: 6px; font-size: 0.65rem; font-weight: 600; }
-        
+
         .note-footer { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); }
-        
-        .card-SUMMARY { grid-column: 1 / -1; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border-left-color: var(--secondary); }
-        .card-THEOREM { border-left-color: var(--danger); }
-        .card-LEMMA { border-left-color: var(--warning); }
+
+        /* Skeleton loading */
+        @keyframes shimmer { 0%{background-position:-600px 0} 100%{background-position:600px 0} }
+        .skeleton-card { background: var(--card); border: 1px solid var(--border); border-left: 4px solid rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 20px; }
+        .skeleton-line { background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%); background-size: 600px 100%; animation: shimmer 1.5s infinite; border-radius: 6px; margin-bottom: 0.8rem; }
+
+        /* Card entrance animation */
+        @keyframes cardIn { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+        .note-card { animation: cardIn 0.35s ease both; }
+
+        /* Stat cards */
+        .stat-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem 1.5rem; display: flex; flex-direction: column; gap: 0.3rem; }
+        .stat-card-value { font-size: 2rem; font-weight: 800; line-height: 1; }
+        .stat-card-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
         #progressContainer { width: 100%; margin-top: 1rem; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; display: none; }
         #progressBar { width: 0%; height: 6px; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: 0.4s; }
@@ -172,6 +198,14 @@
             </div>
         </div>
         
+        <div class="stat-cards" id="statCards">
+            <div class="stat-card"><span class="stat-card-value" id="statTotal" style="color:#818cf8">0</span><span class="stat-card-label">Total Cards</span></div>
+            <div class="stat-card"><span class="stat-card-value" id="statDefs" style="color:#818cf8">0</span><span class="stat-card-label">Definitions</span></div>
+            <div class="stat-card"><span class="stat-card-value" id="statThms" style="color:#f87171">0</span><span class="stat-card-label">Theorems</span></div>
+            <div class="stat-card"><span class="stat-card-value" id="statRels" style="color:#4ade80">0</span><span class="stat-card-label">Relations</span></div>
+            <div class="stat-card"><span class="stat-card-value" id="statDocs" style="color:#38bdf8">0</span><span class="stat-card-label">Documents</span></div>
+        </div>
+
         <div class="dashboard-grid">
             <div class="stats-panel glass-panel">
                 <h3 style="font-size: 1.1rem;">Distribution</h3>
@@ -383,7 +417,33 @@
             }
         }
 
+        function countUp(el, target, duration = 900) {
+            const start = performance.now();
+            const from = parseInt(el.textContent) || 0;
+            function step(now) {
+                const p = Math.min((now - start) / duration, 1);
+                const ease = 1 - Math.pow(1 - p, 3);
+                el.textContent = Math.round(from + (target - from) * ease);
+                if (p < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        async function updateStatCards() {
+            try {
+                const [relsRes] = await Promise.all([req('/relations')]);
+                const rels = await relsRes.json();
+                const docs = new Set(allNotes.map(n => n.doc_id)).size;
+                countUp(document.getElementById('statTotal'), allNotes.length);
+                countUp(document.getElementById('statDefs'),  allNotes.filter(n => n.kind === 'definition').length);
+                countUp(document.getElementById('statThms'),  allNotes.filter(n => n.kind === 'theorem').length);
+                countUp(document.getElementById('statRels'),  rels.length);
+                countUp(document.getElementById('statDocs'),  docs);
+            } catch(e) {}
+        }
+
         async function fetchData() {
+            showSkeleton();
             try {
                 const [notesRes, statsRes] = await Promise.all([
                     req('/notes'),
@@ -395,6 +455,7 @@
                 buildTagCloud();
                 updateTabCounts();
                 applyFilters();
+                updateStatCards();
             } catch(e) { console.error("Load error", e); }
         }
 
@@ -486,11 +547,30 @@
 
         function hideTagSuggestions() { document.getElementById('tagSuggestBox').style.display='none'; }
 
+        const KIND_COLORS = { definition:'#818cf8', theorem:'#f87171', lemma:'#fbbf24', example:'#4ade80', question:'#c084fc', note:'#94a3b8', summary:'#38bdf8' };
+
+        function showSkeleton() {
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = Array(6).fill(0).map(() => `
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:60px;height:10px;"></div>
+                    <div class="skeleton-line" style="width:75%;height:18px;margin-top:0.5rem;"></div>
+                    <div class="skeleton-line" style="width:100%;height:12px;"></div>
+                    <div class="skeleton-line" style="width:90%;height:12px;"></div>
+                    <div class="skeleton-line" style="width:40%;height:10px;margin-top:1rem;"></div>
+                </div>`).join('');
+        }
+
         function renderNotes(notes) {
             const container = document.getElementById('notesContainer');
-            if(!notes.length) return container.innerHTML = '<div style="grid-column:1/-1; text-align:center; opacity:0.5; padding:3rem;">No nodes found...</div>';
+            if(!notes.length) return container.innerHTML = `
+                <div style="grid-column:1/-1;text-align:center;padding:4rem 2rem;opacity:0.6;">
+                    <div style="font-size:3rem;margin-bottom:1rem;">📭</div>
+                    <div style="font-size:1.1rem;font-weight:600;color:var(--text);">No cards found</div>
+                    <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.5rem;">Upload a document or load the demo dataset to get started.</div>
+                </div>`;
             
-            container.innerHTML = notes.map(n => {
+            container.innerHTML = notes.map((n, idx) => {
                 const isSummary = n.kind === 'summary';
                 let anchorsHtml = "";
                 try {
@@ -512,9 +592,9 @@
                 const methodHtml = n.extraction_method ? `<span style="font-size:0.65rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${n.extraction_method}</span>` : '';
 
                 return `
-                <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}" style="cursor:pointer" onclick="openCard('${n.card_id}')" title="Click for details">
+                <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}" style="cursor:pointer;animation-delay:${Math.min(idx*0.04,0.4)}s" onclick="openCard('${n.card_id}')" title="Click for details">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                        <span class="cat-tag" style="margin-bottom:0">${n.kind}</span>
+                        <span class="cat-tag" style="margin-bottom:0;color:${KIND_COLORS[n.kind]||'#818cf8'}">${n.kind}</span>
                         <div style="display:flex;gap:6px;align-items:center">${confHtml}${methodHtml}</div>
                     </div>
                     <h3 class="note-title">${n.title || 'Untitled'}</h3>
