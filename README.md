@@ -1,97 +1,153 @@
-# 🎓 Parser AI - Enterprise Academic Intelligence
+# Academic Parser AI
 
-Parser AI is an enterprise-grade academic document analysis platform. It leverages advanced OCR, Large Language Models (LLMs), and modern software architecture to strictly extract Definitions, Lemmas, and Theorems from academic documents (PDF, TXT, MD) while ensuring zero hallucination.
+An AI-powered academic knowledge extraction system. Upload PDF, TXT, or Markdown documents and automatically extract structured knowledge cards — definitions, theorems, lemmas, examples, questions, and notes — with a full relation graph and interactive web dashboard.
 
-## 🚀 Key Enterprise Features
+---
 
-* **Smart Language-Aware Caching:** Implements an MD5 Hash-based caching system. Previously processed documents are retrieved from the local SQLite cache in <0.1s without redundant AI API calls.
+## Features
 
-* **Multi-Format Processing (Full Compliance):** * Strict support for .txt and .md (paragraph-based segmentation as per Week 1 requirements).
+- **Multi-format support** — PDF (with OCR fallback for scanned pages), TXT, Markdown
+- **LLM extraction** — Groq Llama-3.3-70b extracts typed knowledge cards with confidence scores, tags, and anchors
+- **Rule-based fallback** — Regex-based extractor activates automatically when the LLM API is unavailable
+- **Knowledge graph** — Visualize card relations with vis.js (force-directed layout)
+- **Relation layer** — Manual and auto-suggested relations: `related_to`, `depends_on`, `example_of`, `uses`, `generalizes`
+- **Tag filtering** — Tag cloud + full-text search + kind filter tabs
+- **Export** — CSV and Markdown export with all fields and relations
+- **Analytics** — Per-file processing stats (time, tokens, pages)
+- **Demo dataset** — One-click load of 3 pre-built academic documents with gold-standard annotations
+- **Caching** — MD5-based deduplication prevents reprocessing the same file
+- **Evaluation suite** — Automated scoring against hand-annotated gold standard (87% precision)
 
-* Advanced PDF parsing with Tesseract OCR fallback for scanned/image-based documents.
+---
 
-* **Zero-Hallucination Extraction:** Utilizes a highly restricted temperature=0.0 prompt architecture to ensure the AI only extracts genuine academic entities found in the source.
+## Tech Stack
 
-* **Performance & Token Analytics:** Built-in telemetry system that logs processing time, page counts, and exact token consumption. Data is exportable for cost and performance analysis.
- 
-* **RAG-Powered AI Assistant:** Features a Retrieval-Augmented Generation (RAG) assistant that allows users to query the extracted database strictly based on the document context.
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI + Uvicorn |
+| Database | SQLite (Repository pattern + ABC interface) |
+| LLM | Groq API — `llama-3.3-70b-versatile` |
+| PDF processing | PyMuPDF + pdf2image + pytesseract (OCR) |
+| Frontend | Vanilla JS + Chart.js + vis.js Network |
+| Auth | X-API-Key header middleware |
+| Container | Docker + docker-compose |
 
-## 📋 Academic Compliance (Core Requirements)
+---
 
-The system strictly adheres to the schema and logic defined in the project specifications:
+## Quick Start
 
-* **Card Kinds:** definition, lemma, theorem, example, question, note.
+### Local
 
-* **Mandatory Fields:** Every card includes card_id, doc_id, kind, title, body, anchors, and span_hint.
-
-* **Card ID Logic:** Generated using the doc_id_index_kind pattern for full traceability across the pipeline.
-
-* **Official CSV Export:** Exported cards_summary.csv strictly follows the required headers: card_id, doc_id, kind, title, span_hint.
-
-## 🏗️ System Architecture
-
-* **Backend:** FastAPI (Python 3.10+)
-
-* **Design Patterns:** Repository Pattern, Dependency Injection, Strategy (for OCR routing).
-
-* **AI Engine:** Groq API (llama-3.3-70b-versatile).
-
-* **Database:** SQLite3 (Note Repository, Cache Tracking, Analytics Logging).
-
-* **Infrastructure:** Fully Dockerized for isolated, one-click deployments.
-
-## 🐳 Getting Started (Docker Deployment - Recommended)
-
-The application is fully containerized, ensuring that all OS-level dependencies (like tesseract-ocr and poppler-utils) are perfectly isolated.
-
-1- Click Installation
-
-Clone the repository:
-```
-git clone [https://github.com/isencao/AcademicParserAPI.git](https://github.com/isencao/AcademicParserAPI.git)
-cd AcademicParserAPI
-```
-
-2- Environment Variables:
-Create a .env file with your keys:
-```
-GROQ_API_KEY=your_groq_api_key_here
-DASHBOARD_PASS=123456
-```
-
-3- Spin up the Container:
-```
-docker compose up -d --build
-```
-
-## 💻 Getting Started (Local Deployment)
-
-1- Clone & Install Dependencies:
-```
-git clone [https://github.com/isencao/AcademicParserAPI.git]
+```bash
+git clone https://github.com/isencao/AcademicParserAPI.git
 cd AcademicParserAPI
 pip install -r requirements.txt
 ```
 
-2- Environment Variables:
-Create a .env file in the root directory:
-```
+Create `.env`:
+
+```env
 GROQ_API_KEY=your_groq_api_key_here
-DASHBOARD_PASS=123456
+DASHBOARD_PASS=your_password
 ```
 
-3- Run the Server:
+```bash
+uvicorn main:app --reload --port 8000
+# Windows: start.bat
 ```
-python -m uvicorn main:app --reload
+
+Open `index.html` in a browser and enter your password.
+
+### Docker
+
+```bash
+docker-compose up --build
 ```
 
-(Alternatively, run the start.bat file if on Windows)
+---
 
-## 🎯 Technical Presentation Highlights
+## Project Structure
 
-* **Rate Limit Protection:** Implemented a 15-second cooldown between batches to protect API quotas.
+```
+AcademicParserAPI/
+├── main.py           # FastAPI app, auth middleware
+├── routes.py         # All API endpoints
+├── services.py       # LLM extraction, rule-based fallback, batch processor
+├── database.py       # SQLite repository (interface + implementation)
+├── index.html        # Single-page dashboard
+├── eval/
+│   ├── docs/         # 3 academic Markdown documents
+│   ├── expected/     # Gold-standard annotation JSON files
+│   ├── results/      # Evaluation reports (gitignored)
+│   └── run_eval.py   # Automated evaluation script
+└── Uploads/          # Temporary upload directory (gitignored)
+```
 
-* **Traceability:** Used real filenames as doc_id to ensure extracted notes remain linked to their original sources.
+---
 
-* **Architecture:** Demonstrating the use of Abstract Base Classes (ABC) for the Repository interface to ensure SOLID compliance and easy database swapping.
+## API Endpoints
 
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Health check |
+| POST | `/api/notes/upload` | Upload and process a file |
+| GET | `/api/notes/progress/{task_id}` | Poll processing progress |
+| GET | `/api/notes` | List all extracted cards |
+| GET | `/api/stats` | Card count by kind |
+| DELETE | `/api/notes/clear-all` | Wipe all data |
+| GET | `/api/notes/export/csv` | Export cards as CSV |
+| GET | `/api/notes/export/md` | Export cards as Markdown |
+| GET | `/api/relations` | List relations (optional `?card_id=`) |
+| POST | `/api/relations` | Add a relation |
+| DELETE | `/api/relations/{id}` | Delete a relation |
+| POST | `/api/relations/auto-suggest` | Run heuristic auto-suggest |
+| GET | `/api/analytics` | Processing stats as JSON |
+| GET | `/api/analytics/export/csv` | Export analytics as CSV |
+| POST | `/api/demo/load` | Load demo dataset |
+
+---
+
+## Card Schema
+
+| Field | Description |
+|---|---|
+| `card_id` | Unique 8-char hex identifier |
+| `doc_id` | Source filename |
+| `kind` | `definition` / `theorem` / `lemma` / `example` / `question` / `note` / `summary` |
+| `title` | Card title |
+| `body` | Full content |
+| `anchors` | Key terms and LaTeX tokens (e.g. `$G$`, `$O(n)$`) |
+| `tags` | 2–5 lowercase topic tags |
+| `span_hint` | Page or paragraph reference |
+| `confidence` | 0.0–1.0 extraction confidence |
+| `extraction_method` | `llm`, `rule_based`, or `ocr` |
+
+---
+
+## Evaluation Results
+
+Evaluated against 3 hand-annotated academic documents (38 expected cards total):
+
+| Document | Expected | Extracted | Correct |
+|---|---|---|---|
+| Graph Connectivity | 15 | 15 | **15** |
+| Matching Basics | 11 | 11 | **10** |
+| Approximation Basics | 12 | 10 | **8** |
+| **Total** | **38** | **36** | **33 (87%)** |
+
+To re-run evaluation:
+
+```bash
+python eval/run_eval.py
+# Output: eval/results/eval_report.md
+```
+
+---
+
+## Architecture Notes
+
+- **Repository pattern** — `IDocumentRepository` ABC allows swapping SQLite for any other backend
+- **Background tasks** — File processing runs in a FastAPI `BackgroundTask`; progress is polled via SSE-like endpoint
+- **Rate limit protection** — 15-second cooldown between batches; rule-based extractor as automatic fallback
+- **Kind normalization** — LLM variants (`open question`, `remark`, `proposition`) are mapped to canonical kinds at parse time
+- **LaTeX safety** — Invalid JSON escape sequences from LaTeX math are sanitized before `json.loads`
