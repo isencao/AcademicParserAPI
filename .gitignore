@@ -1,6 +1,6 @@
 .env
 
-pycache/
+__pycache__/
 *.py[cod]
 *$py.class
 .venv/
@@ -12,7 +12,7 @@ dist/
 
 Uploads/
 
-academic_notes.db
+*.db
 
 .vscode/
 .idea/
@@ -23,13 +23,10 @@ academic_notes.db
 *.log
 Thumbs.db
 
-echo "Uploads/*"
-echo "__pycache__/"
-echo "*.db" 
-echo ".env" 
-
 export.csv
 export.md
 cards_summary.csv
+analytics_export.csv
 testpdf/
-app.log
+
+eval/results/

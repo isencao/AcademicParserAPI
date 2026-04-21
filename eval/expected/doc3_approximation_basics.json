@@ -1,0 +1,74 @@
+[
+  {
+    "kind": "definition",
+    "title": "Optimization Problem",
+    "key_terms": ["optimization problem", "feasible solutions", "objective function", "minimize", "maximize"],
+    "notes": "Formal definition; must not be merged with Approximation Ratio."
+  },
+  {
+    "kind": "definition",
+    "title": "Approximation Ratio",
+    "key_terms": ["approximation ratio", "alpha", "A(I)", "OPT(I)"],
+    "notes": "Core definition for the whole topic."
+  },
+  {
+    "kind": "definition",
+    "title": "PTAS",
+    "key_terms": ["PTAS", "polynomial-time approximation scheme", "epsilon", "1 + epsilon"],
+    "notes": "Acronym must be recognized; must be definition."
+  },
+  {
+    "kind": "definition",
+    "title": "APX",
+    "key_terms": ["APX", "constant-factor", "NP optimization"],
+    "notes": "Complexity class definition — must be definition not note."
+  },
+  {
+    "kind": "definition",
+    "title": "Vertex Cover",
+    "key_terms": ["vertex cover", "C", "every edge", "at least one"],
+    "notes": "Standard definition; must be separate from the approximation theorem."
+  },
+  {
+    "kind": "theorem",
+    "title": "2-Approximation for Vertex Cover",
+    "key_terms": ["2-approximation", "vertex cover", "greedy", "matching", "2|M|"],
+    "notes": "Has full proof — must be theorem, not note."
+  },
+  {
+    "kind": "note",
+    "title": "Vertex Cover APX-Hardness",
+    "key_terms": ["APX-hard", "Unique Games Conjecture", "ratio below 2"],
+    "notes": "A remark, not a formal theorem — correctly a note."
+  },
+  {
+    "kind": "definition",
+    "title": "Set Cover",
+    "key_terms": ["set cover", "universe U", "family F", "sub-collection"],
+    "notes": "Must be definition, separate from the greedy theorem."
+  },
+  {
+    "kind": "theorem",
+    "title": "Greedy H_n-Approximation for Set Cover",
+    "key_terms": ["greedy", "H_n", "log n", "set cover"],
+    "notes": "Named result with approximation ratio — must be theorem."
+  },
+  {
+    "kind": "lemma",
+    "title": "Greedy Progress Bound",
+    "key_terms": ["greedy", "uncovered elements", "e^{-k/OPT}"],
+    "notes": "Supporting lemma for the theorem above — must be lemma not note."
+  },
+  {
+    "kind": "example",
+    "title": "Set Cover Greedy on Small Instance",
+    "key_terms": ["U = {1,2,3,4,5,6}", "greedy", "optimal", "size 2"],
+    "notes": "Explicit worked example — must be example."
+  },
+  {
+    "kind": "question",
+    "title": "Set Cover Inapproximability",
+    "key_terms": ["o(log n)", "inapproximability", "ln n", "P != NP"],
+    "notes": "Open question — must be question not note."
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "kind": "definition",
+    "title": "Graph",
+    "key_terms": ["V", "E", "vertices", "edges"],
+    "notes": "Opening formal definition; must be extracted as definition, not note."
+  },
+  {
+    "kind": "definition",
+    "title": "Path",
+    "key_terms": ["path", "sequence", "vertices", "length"],
+    "notes": "Distinct from Graph definition — wrong split would merge these two."
+  },
+  {
+    "kind": "definition",
+    "title": "Connected Graph",
+    "key_terms": ["connected", "path", "every pair"],
+    "notes": "Core concept; should not be merged with Connected Component."
+  },
+  {
+    "kind": "definition",
+    "title": "Connected Component",
+    "key_terms": ["component", "maximal", "subgraph"],
+    "notes": "Separate card from Connected Graph."
+  },
+  {
+    "kind": "definition",
+    "title": "Cut Vertex",
+    "key_terms": ["cut vertex", "articulation point", "connected components"],
+    "notes": "Often confused with Bridge — must be separate."
+  },
+  {
+    "kind": "definition",
+    "title": "Bridge",
+    "key_terms": ["bridge", "edge", "connected components"],
+    "notes": "Separate card from Cut Vertex."
+  },
+  {
+    "kind": "lemma",
+    "title": "Bridge Characterization",
+    "key_terms": ["bridge", "cycle", "if and only if"],
+    "notes": "Has a proof sketch; must be classified as lemma, not note."
+  },
+  {
+    "kind": "theorem",
+    "title": "DFS Bridge Detection",
+    "key_terms": ["DFS", "bridge", "O(V+E)", "time"],
+    "notes": "Algorithmic theorem — must be theorem, not note or definition."
+  },
+  {
+    "kind": "definition",
+    "title": "k-Connected Graph",
+    "key_terms": ["k-connected", "connectivity", "kappa"],
+    "notes": "Must be definition; the variable kappa is a key anchor."
+  },
+  {
+    "kind": "example",
+    "title": "Connectivity of Complete Graph and Cycle",
+    "key_terms": ["complete graph", "K_n", "cycle", "C_n", "2-connected"],
+    "notes": "Concrete example of k-connectivity — must be example, not definition."
+  },
+  {
+    "kind": "theorem",
+    "title": "Menger's Theorem",
+    "key_terms": ["Menger", "vertex-disjoint paths", "minimum vertex cut"],
+    "notes": "Named theorem; must be theorem not note."
+  },
+  {
+    "kind": "question",
+    "title": "Connectivity Computation Complexity",
+    "key_terms": ["kappa(G)", "algorithm", "O(V^1.5)"],
+    "notes": "Open question explicitly stated; must be question, not note."
+  },
+  {
+    "kind": "definition",
+    "title": "Eulerian Circuit",
+    "key_terms": ["Eulerian circuit", "closed walk", "every edge"],
+    "notes": "Formal definition."
+  },
+  {
+    "kind": "theorem",
+    "title": "Euler's Theorem",
+    "key_terms": ["Eulerian circuit", "even degree", "if and only if"],
+    "notes": "Classic theorem; must not be merged with Eulerian Path note."
+  },
+  {
+    "kind": "note",
+    "title": "Eulerian Path Condition",
+    "key_terms": ["Eulerian path", "two vertices", "odd degree"],
+    "notes": "Correctly a note (no formal proof, a remark)."
+  }
+]

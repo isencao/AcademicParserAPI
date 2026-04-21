@@ -83,6 +83,36 @@
         .chat-body { flex-grow: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem; }
         .msg-user { background: var(--primary); color: white; align-self: flex-end; padding: 10px; border-radius: 12px; border-bottom-right-radius: 2px; }
         .msg-ai { background: rgba(255,255,255,0.1); color: var(--text); align-self: flex-start; padding: 10px; border-radius: 12px; border-bottom-left-radius: 2px; }
+
+        /* SIDEBAR NAV LINKS */
+        .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 0.7rem 1rem; border-radius: 10px; cursor: pointer; color: var(--text-muted); font-size: 0.9rem; transition: 0.2s; margin-bottom: 0.3rem; }
+        .sidebar-link:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+        .sidebar-link.active { background: rgba(99,102,241,0.15); color: var(--primary); }
+
+        /* EVAL TABLE */
+        .eval-table-wrap { overflow-x: auto; }
+        .eval-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .eval-table th { text-align: left; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .eval-table td { padding: 0.8rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: top; }
+        .eval-table tr:hover td { background: rgba(255,255,255,0.03); }
+        .kind-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+        .kind-definition { background: rgba(99,102,241,0.2); color: #818cf8; }
+        .kind-theorem    { background: rgba(239,68,68,0.2);  color: #f87171; }
+        .kind-lemma      { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .kind-example    { background: rgba(34,197,94,0.2);  color: #4ade80; }
+        .kind-question   { background: rgba(168,85,247,0.2); color: #c084fc; }
+        .kind-note       { background: rgba(148,163,184,0.2); color: #94a3b8; }
+        .kind-summary    { background: rgba(14,165,233,0.2); color: #38bdf8; }
+        .verdict-btn { padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; transition: 0.2s; margin-right: 4px; margin-bottom: 4px; white-space: nowrap; }
+        .verdict-btn.selected-correct  { background: rgba(34,197,94,0.2);  color: #4ade80;  border-color: #4ade80; }
+        .verdict-btn.selected-wrong    { background: rgba(239,68,68,0.2);  color: #f87171;  border-color: #f87171; }
+        .verdict-btn.selected-split    { background: rgba(245,158,11,0.2); color: #fbbf24;  border-color: #fbbf24; }
+        .verdict-btn.selected-noise    { background: rgba(148,163,184,0.2);color: #94a3b8;  border-color: #94a3b8; }
+        .eval-note-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 0.78rem; padding: 2px 4px; outline: none; font-family: inherit; }
+        .eval-note-input:focus { border-bottom-color: var(--primary); }
+        .eval-summary-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 1rem 0; font-size: 0.9rem; }
+        .eval-stat { display: flex; align-items: center; gap: 6px; }
+        .eval-doc-filter { background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; }
     </style>
 </head>
 <body>
@@ -102,6 +132,9 @@
             <div id="statusDot" style="width: 8px; height: 8px; border-radius: 50%; background: grey;"></div>
             <span id="statusText">Checking...</span>
         </div>
+        <div style="margin-top: 2rem;" class="sidebar-nav">VIEWS</div>
+        <div class="sidebar-link active" id="navDashboard" onclick="switchView('dashboard')">📊 Dashboard</div>
+        <div class="sidebar-link" id="navEval" onclick="switchView('eval')">🔬 Evaluation</div>
         <div style="margin-top: 2rem;" class="sidebar-nav">VERSION</div>
         <div style="font-size: 0.9rem; color: var(--text-muted);">Final Enterprise v2.5</div>
         <button class="btn btn-danger" style="position: absolute; bottom: 2rem; width: 80%;" onclick="logout()">Terminate Session</button>
@@ -146,6 +179,44 @@
                 </div>
                 
                 <div id="notesContainer" class="notes-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EVAL PANEL -->
+    <div class="main" id="evalPanel" style="display:none;">
+        <div class="glass-panel">
+            <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                <h2 style="font-size:1.2rem;">🔬 Evaluation Table</h2>
+                <select id="evalDocFilter" class="eval-doc-filter" onchange="renderEvalTable()">
+                    <option value="ALL">All Documents</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadEvalData()" style="margin-left:auto;">↻ Refresh</button>
+                <button class="btn btn-success" onclick="exportEvalCSV()">Export Eval CSV</button>
+            </div>
+            <div class="eval-summary-bar" id="evalSummaryBar">
+                <span style="color:var(--text-muted); font-size:0.85rem;">Upload a PDF from Dashboard, then come here to review extracted cards.</span>
+            </div>
+        </div>
+
+        <div class="glass-panel">
+            <div class="eval-table-wrap">
+                <table class="eval-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Kind</th>
+                            <th>Title</th>
+                            <th>Page</th>
+                            <th>Body Preview</th>
+                            <th>Verdict</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="evalTableBody">
+                        <tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">No cards yet — upload a document first.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -333,7 +404,129 @@
         function exportData(type) { window.location.href = `${API_URL}/notes/export/${type}`; }
         async function clearVault() { if(confirm("Wipe all data?")) { await req('/notes/clear-all', {method:'DELETE'}); fetchData(); } }
         
-        function toggleChat() { 
+        // ── EVAL ────────────────────────────────────────────────────────────
+        let evalNotes = [], evalVerdicts = {};
+
+        function switchView(view) {
+            const dashboard = document.querySelector('.main:not(#evalPanel)');
+            const evalPanel = document.getElementById('evalPanel');
+            document.getElementById('navDashboard').classList.toggle('active', view === 'dashboard');
+            document.getElementById('navEval').classList.toggle('active', view === 'eval');
+            if (view === 'eval') {
+                dashboard.style.display = 'none';
+                evalPanel.style.display = 'block';
+                loadEvalData();
+            } else {
+                dashboard.style.display = 'block';
+                evalPanel.style.display = 'none';
+            }
+        }
+
+        async function loadEvalData() {
+            try {
+                const r = await req('/notes');
+                evalNotes = await r.json();
+                populateDocFilter();
+                renderEvalTable();
+            } catch(e) { console.error('Eval load error', e); }
+        }
+
+        function populateDocFilter() {
+            const sel = document.getElementById('evalDocFilter');
+            const docs = [...new Set(evalNotes.map(n => n.doc_id).filter(Boolean))];
+            sel.innerHTML = '<option value="ALL">All Documents</option>' +
+                docs.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+
+        function renderEvalTable() {
+            const docFilter = document.getElementById('evalDocFilter').value;
+            const notes = evalNotes.filter(n =>
+                n.kind !== 'summary' && (docFilter === 'ALL' || n.doc_id === docFilter)
+            );
+
+            const kindClass = { definition:'kind-definition', theorem:'kind-theorem', lemma:'kind-lemma',
+                                example:'kind-example', question:'kind-question', note:'kind-note', summary:'kind-summary' };
+
+            const rows = notes.map((n, i) => {
+                const id = n.card_id || n.id;
+                const v = evalVerdicts[id] || {};
+                const body = (n.body || '').replace(/</g,'&lt;').slice(0, 120);
+                const klass = kindClass[n.kind] || '';
+                const btn = (label, cls, val) =>
+                    `<button class="verdict-btn ${v.verdict === val ? 'selected-'+cls : ''}"
+                        onclick="setVerdict('${id}','${val}',this)">${label}</button>`;
+                return `<tr>
+                    <td style="color:var(--text-muted)">${i+1}</td>
+                    <td><span class="kind-badge ${klass}">${n.kind}</span></td>
+                    <td style="font-weight:600; max-width:200px;">${(n.title||'').slice(0,60)}</td>
+                    <td style="color:var(--text-muted); white-space:nowrap;">${n.span_hint||'-'}</td>
+                    <td style="color:#94a3b8; max-width:260px; font-size:0.8rem;">${body}…</td>
+                    <td style="white-space:nowrap;">
+                        ${btn('✅ Correct','correct','correct')}
+                        ${btn('❌ Wrong type','wrong','wrong')}
+                        ${btn('🔀 Wrong split','split','split')}
+                        ${btn('🔊 Noise','noise','noise')}
+                    </td>
+                    <td><input class="eval-note-input" placeholder="note…"
+                        value="${v.note||''}"
+                        onchange="setNote('${id}', this.value)"></td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('evalTableBody').innerHTML = rows ||
+                '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">No cards for this document.</td></tr>';
+
+            renderEvalSummary(notes);
+        }
+
+        function setVerdict(id, val, btn) {
+            if (!evalVerdicts[id]) evalVerdicts[id] = {};
+            evalVerdicts[id].verdict = evalVerdicts[id].verdict === val ? null : val;
+            renderEvalTable();
+        }
+
+        function setNote(id, val) {
+            if (!evalVerdicts[id]) evalVerdicts[id] = {};
+            evalVerdicts[id].note = val;
+        }
+
+        function renderEvalSummary(notes) {
+            const total   = notes.length;
+            const correct = Object.values(evalVerdicts).filter(v => v.verdict === 'correct').length;
+            const wrong   = Object.values(evalVerdicts).filter(v => v.verdict === 'wrong').length;
+            const split   = Object.values(evalVerdicts).filter(v => v.verdict === 'split').length;
+            const noise   = Object.values(evalVerdicts).filter(v => v.verdict === 'noise').length;
+            const pending = total - correct - wrong - split - noise;
+            document.getElementById('evalSummaryBar').innerHTML = `
+                <span class="eval-stat">📋 Total: <strong>${total}</strong></span>
+                <span class="eval-stat" style="color:#4ade80">✅ Correct: <strong>${correct}</strong></span>
+                <span class="eval-stat" style="color:#f87171">❌ Wrong type: <strong>${wrong}</strong></span>
+                <span class="eval-stat" style="color:#fbbf24">🔀 Wrong split: <strong>${split}</strong></span>
+                <span class="eval-stat" style="color:#94a3b8">🔊 Noise: <strong>${noise}</strong></span>
+                <span class="eval-stat" style="color:var(--text-muted)">⏳ Pending: <strong>${pending}</strong></span>`;
+        }
+
+        function exportEvalCSV() {
+            const docFilter = document.getElementById('evalDocFilter').value;
+            const notes = evalNotes.filter(n =>
+                n.kind !== 'summary' && (docFilter === 'ALL' || n.doc_id === docFilter)
+            );
+            const rows = [['#','card_id','doc_id','kind','title','span_hint','body_preview','verdict','note']];
+            notes.forEach((n, i) => {
+                const v = evalVerdicts[n.card_id || n.id] || {};
+                rows.push([i+1, n.card_id||'', n.doc_id||'', n.kind||'', (n.title||'').replace(/,/g,' '),
+                    n.span_hint||'', (n.body||'').slice(0,80).replace(/,/g,' ').replace(/\n/g,' '),
+                    v.verdict||'pending', (v.note||'').replace(/,/g,' ')]);
+            });
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+            a.download = `eval_${docFilter}_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        }
+        // ── END EVAL ─────────────────────────────────────────────────────────
+
+        function toggleChat() {
             const p = document.getElementById('chatPanel');
             p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
         }

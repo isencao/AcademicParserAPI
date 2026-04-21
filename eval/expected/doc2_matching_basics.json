@@ -1,0 +1,68 @@
+[
+  {
+    "kind": "definition",
+    "title": "Matching",
+    "key_terms": ["matching", "edges", "no two edges", "endpoint", "free", "exposed"],
+    "notes": "Introduces both matching and free vertex — acceptable as one card or two; split would be fine."
+  },
+  {
+    "kind": "definition",
+    "title": "Maximum Matching",
+    "key_terms": ["maximum matching", "as large as possible"],
+    "notes": "Must not be merged with Perfect Matching."
+  },
+  {
+    "kind": "definition",
+    "title": "Perfect Matching",
+    "key_terms": ["perfect matching", "every vertex", "|M| = |V|/2"],
+    "notes": "Must not be merged with Maximum Matching."
+  },
+  {
+    "kind": "definition",
+    "title": "Augmenting Path",
+    "key_terms": ["augmenting path", "alternating", "free vertices"],
+    "notes": "Key concept for Berge's theorem — must be definition, not note."
+  },
+  {
+    "kind": "theorem",
+    "title": "Berge's Theorem",
+    "key_terms": ["Berge", "maximum", "augmenting path", "if and only if"],
+    "notes": "Named theorem with proof sketch; must be theorem."
+  },
+  {
+    "kind": "lemma",
+    "title": "Symmetric Difference of Matchings",
+    "key_terms": ["symmetric difference", "paths", "even cycles", "alternate"],
+    "notes": "Lemma used inside Berge proof — must be lemma not note."
+  },
+  {
+    "kind": "definition",
+    "title": "Bipartite Graph",
+    "key_terms": ["bipartite", "partition", "A", "B"],
+    "notes": "Standard definition."
+  },
+  {
+    "kind": "theorem",
+    "title": "König's Theorem",
+    "key_terms": ["König", "maximum matching", "minimum vertex cover", "bipartite"],
+    "notes": "Named theorem; must be theorem not note."
+  },
+  {
+    "kind": "example",
+    "title": "König's Theorem Illustration",
+    "key_terms": ["a1", "a2", "a3", "b1", "b2", "b3", "vertex cover"],
+    "notes": "Explicit example confirming König's — must be example."
+  },
+  {
+    "kind": "theorem",
+    "title": "Hall's Marriage Theorem",
+    "key_terms": ["Hall", "N(S)", "|N(S)| >= |S|", "saturates"],
+    "notes": "Named theorem."
+  },
+  {
+    "kind": "question",
+    "title": "Bipartite Matching Below Hopcroft-Karp",
+    "key_terms": ["Hopcroft-Karp", "o(m sqrt n)", "matrix multiplication"],
+    "notes": "Open question — must be question, not note."
+  }
+]
