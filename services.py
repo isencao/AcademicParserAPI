@@ -43,27 +43,47 @@ def analyze_with_groq(text, target_lang="auto"):
     # HOCANIN İSTEDİĞİ YENİ ŞEMA FORMATI (card_id, anchors, span_hint vb.)
 # PROMPT GÜNCELLEMESİ: 'span_hint' için sadece rakam istiyoruz ve summary kuralını ekliyoruz
     prompt = f"""
-    Analyze the text as an academic data scientist. produce ONLY JSON.
-    
-    RULES:
-    1. TARGET LANGUAGE: {lang_instruction}
-    2. CARD KINDS: Identify 'definition', 'lemma', 'theorem', 'example', 'question', or 'note'.
-    3. ANCHORS: Extract 3-10 key tokens. Include LaTeX math symbols (e.g. $G$, $\alpha$) and academic terms.
-    4. SPAN_HINT: Write ONLY the page/paragraph number.
-    5. FIELDS:
-       - "summary": 2-3 sentence overview.
-       - "notes": Array of [kind, title, body, anchors, span_hint].
-    
-    Return ONLY valid JSON.
-    Text:
-    {text}
-    """
+You are an academic knowledge extraction engine. Your job is to extract EVERY distinct academic concept from the text as a separate card.
+
+CRITICAL RULE: Extract ALL occurrences. If the text has 5 definitions, produce 5 definition cards. If it has 3 theorems, produce 3 theorem cards. Do NOT merge or skip. One concept = one card.
+
+CARD KINDS — use exactly these values:
+- "definition"  : introduces/defines a term or concept
+- "theorem"     : a formally stated result (may include proof)
+- "lemma"       : a helper result used to prove something else
+- "example"     : a concrete instance illustrating a concept
+- "question"    : an open problem or research question
+- "note"        : a remark, observation, or corollary that does not fit above
+
+FIELD RULES:
+1. {lang_instruction}
+2. anchors: 3-10 key tokens including LaTeX (e.g. "$G$", "$O(n)$") and core terms.
+3. span_hint: page or paragraph number only (e.g. "3", "para-2").
+4. tags: 2-5 lowercase hyphenated topic tags (e.g. "graph-theory", "np-hard", "proof-technique").
+5. confidence: float 0.0–1.0.
+   - 1.0 = explicit label in text ("Definition:", "Theorem 3:")
+   - 0.8 = clearly implied by structure
+   - 0.6 = inferred from content
+   - 0.4 = ambiguous kind
+
+Return ONLY valid JSON. No markdown, no explanation:
+{{
+  "summary": "2-3 sentence overview of the entire text.",
+  "notes": [
+    {{"kind": "definition", "title": "...", "body": "...", "anchors": [...], "span_hint": "...", "tags": [...], "confidence": 1.0}},
+    {{"kind": "theorem",    "title": "...", "body": "...", "anchors": [...], "span_hint": "...", "tags": [...], "confidence": 0.9}}
+  ]
+}}
+
+TEXT:
+{text}
+"""
     
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0 
+            temperature=0.3,
         )
         
         raw_response = completion.choices[0].message.content
@@ -87,19 +107,30 @@ def analyze_with_groq(text, target_lang="auto"):
                     "title": "Section Overview",
                     "body": data["summary"],
                     "anchors": ["ai-summary", "overview"],
-                    "span_hint": "General"
+                    "tags": ["summary"],
+                    "span_hint": "General",
+                    "confidence": 1.0,
+                    "extraction_method": "llm",
                 })
             
             # 2. Diğer notları listeye ekle
             raw_notes = data.get("notes", [])
             for n in raw_notes:
                 kind = str(n.get("kind", "note")).lower()
+                try:
+                    confidence = float(n.get("confidence", 1.0))
+                    confidence = max(0.0, min(1.0, confidence))
+                except (TypeError, ValueError):
+                    confidence = 1.0
                 extracted_notes.append({
                     "kind": kind,
                     "title": n.get("title", "Untitled"),
                     "body": n.get("body", ""),
                     "anchors": n.get("anchors", []),
-                    "span_hint": n.get("span_hint", "-")
+                    "tags": n.get("tags", []),
+                    "span_hint": n.get("span_hint", "-"),
+                    "confidence": confidence,
+                    "extraction_method": "llm",
                 })
                 
         return extracted_notes, used_tokens
@@ -171,12 +202,13 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
                 update_progress(f"Sending batch {current_batch}/{total_batches} to AI (Pages {start_page + 1}-{end_page})...", base_percent - 10)
                 
                 chunk_text = ""
+                batch_used_ocr = False
                 for page_num in range(start_page, end_page):
                     page = doc[page_num]
                     page_text = page.get_text()
-                    
+
                     current_page_marker = f"\n\n[ATTENTION: PAGE {page_num + 1}]\n\n"
-                    
+
                     if page_text.strip():
                         chunk_text += current_page_marker + page_text
                     else:
@@ -185,17 +217,20 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
                         images = convert_from_path(filepath, first_page=page_num+1, last_page=page_num+1)
                         for image in images:
                             chunk_text += current_page_marker + pytesseract.image_to_string(image)
-                
+                        batch_used_ocr = True
+
                 if chunk_text.strip():
                     update_progress(f"AI analyzing pages {start_page + 1}-{end_page}...", base_percent - 5)
-                    
+
                     notes, batch_tokens = analyze_with_groq(chunk_text, target_lang)
                     total_tokens_used += batch_tokens
-                    
+
                     for idx, n in enumerate(notes):
                         card_id = f"{doc_id}_{start_page+idx:04d}_{slugify(n.get('kind', 'note'))}"
                         n["card_id"] = card_id
                         n["doc_id"] = doc_id
+                        if batch_used_ocr:
+                            n["extraction_method"] = "ocr"
                         all_notes.append(n)
                     
                     if end_page < total_pages:
@@ -212,6 +247,73 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
     logger.info(f"⏱️ Processing Finished in {process_time_sec}s | Total Tokens: {total_tokens_used}")
     
     return all_notes, total_pages, process_time_sec, total_tokens_used
+
+def auto_suggest_relations(notes: list) -> list[dict]:
+    """Heuristic-based relation suggestions between cards.
+
+    Rules (in priority order):
+      example  + definition/theorem with 2+ shared anchors  → example_of
+      theorem  + lemma             with 2+ shared anchors  → theorem uses lemma
+      lemma    + definition        with 2+ shared anchors  → lemma depends_on definition
+      any pair with 3+ shared anchors                      → related_to
+    Returns list of {source, target, relation_type} dicts (no duplicates, no self-loops).
+    """
+    def parse_tokens(note: dict) -> set[str]:
+        tokens: set[str] = set()
+        for field in ("anchors", "tags"):
+            raw = note.get(field, "[]")
+            try:
+                items = json.loads(raw) if isinstance(raw, str) else raw
+                tokens.update(str(t).lower().strip() for t in items if t)
+            except Exception:
+                pass
+        return tokens
+
+    non_summary = [n for n in notes if n.get("kind") != "summary" and n.get("card_id")]
+    token_map = {n["card_id"]: parse_tokens(n) for n in non_summary}
+    kind_map  = {n["card_id"]: n.get("kind", "") for n in non_summary}
+
+    suggestions: list[dict] = []
+    seen: set[tuple] = set()
+
+    def add(src, tgt, rel):
+        key = (src, tgt, rel)
+        if src != tgt and key not in seen:
+            seen.add(key)
+            suggestions.append({"source_card_id": src, "target_card_id": tgt, "relation_type": rel})
+
+    ids = [n["card_id"] for n in non_summary]
+    for i, a in enumerate(ids):
+        for b in ids[i+1:]:
+            shared = token_map[a] & token_map[b]
+            ka, kb = kind_map[a], kind_map[b]
+            n_shared = len(shared)
+
+            if n_shared < 2:
+                continue
+
+            # example_of
+            if ka == "example" and kb in ("definition", "theorem"):
+                add(a, b, "example_of")
+            elif kb == "example" and ka in ("definition", "theorem"):
+                add(b, a, "example_of")
+            # theorem uses lemma
+            elif ka == "theorem" and kb == "lemma":
+                add(a, b, "uses")
+            elif kb == "theorem" and ka == "lemma":
+                add(b, a, "uses")
+            # lemma depends_on definition
+            elif ka == "lemma" and kb == "definition":
+                add(a, b, "depends_on")
+            elif kb == "lemma" and ka == "definition":
+                add(b, a, "depends_on")
+            # generic related_to for strong overlap
+            elif n_shared >= 3:
+                add(a, b, "related_to")
+
+    logger.info(f"Auto-suggest produced {len(suggestions)} relation(s) for {len(non_summary)} cards.")
+    return suggestions
+
 
 def chat_with_notes(user_message: str, notes_list: list):
     if not notes_list:

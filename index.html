@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Academic Parser AI</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -135,6 +136,7 @@
         <div style="margin-top: 2rem;" class="sidebar-nav">VIEWS</div>
         <div class="sidebar-link active" id="navDashboard" onclick="switchView('dashboard')">📊 Dashboard</div>
         <div class="sidebar-link" id="navEval" onclick="switchView('eval')">🔬 Evaluation</div>
+        <div class="sidebar-link" id="navGraph" onclick="switchView('graph')">🕸️ Relations</div>
         <div style="margin-top: 2rem;" class="sidebar-nav">VERSION</div>
         <div style="font-size: 0.9rem; color: var(--text-muted);">Final Enterprise v2.5</div>
         <button class="btn btn-danger" style="position: absolute; bottom: 2rem; width: 80%;" onclick="logout()">Terminate Session</button>
@@ -179,6 +181,45 @@
                 </div>
                 
                 <div id="notesContainer" class="notes-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD DETAIL MODAL -->
+    <div id="cardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:var(--sidebar);border:1px solid var(--border);border-radius:24px;max-width:800px;width:100%;max-height:85vh;overflow-y:auto;padding:2rem;position:relative;">
+            <button onclick="closeModal()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--text-muted);font-size:1.3rem;cursor:pointer;">✕</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- GRAPH PANEL -->
+    <div class="main" id="graphPanel" style="display:none;">
+        <div class="glass-panel" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+            <h2 style="font-size:1.2rem;">🕸️ Knowledge Graph</h2>
+            <button class="btn btn-primary" onclick="runAutoSuggest()">⚡ Auto-Suggest Relations</button>
+            <button class="btn btn-success" onclick="loadGraph()" style="margin-left:auto;">↻ Refresh</button>
+            <span id="graphStats" style="color:var(--text-muted);font-size:0.85rem;"></span>
+        </div>
+        <div class="dashboard-grid" style="grid-template-columns:1fr 320px;">
+            <div class="glass-panel" style="padding:0;overflow:hidden;">
+                <div id="graphContainer" style="width:100%;height:560px;"></div>
+            </div>
+            <div class="glass-panel">
+                <h3 style="font-size:1rem;margin-bottom:1rem;">Relations List</h3>
+                <div id="relationsList" style="font-size:0.82rem;"></div>
+                <hr style="border-color:var(--border);margin:1rem 0;">
+                <h3 style="font-size:0.9rem;margin-bottom:0.8rem;">Add Relation</h3>
+                <input id="relSrc" placeholder="Source card_id" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.5rem;border-radius:8px;margin-bottom:0.5rem;font-size:0.8rem;">
+                <select id="relType" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.5rem;border-radius:8px;margin-bottom:0.5rem;font-size:0.8rem;">
+                    <option value="related_to">related_to</option>
+                    <option value="depends_on">depends_on</option>
+                    <option value="example_of">example_of</option>
+                    <option value="uses">uses</option>
+                    <option value="generalizes">generalizes</option>
+                </select>
+                <input id="relTgt" placeholder="Target card_id" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.5rem;border-radius:8px;margin-bottom:0.8rem;font-size:0.8rem;">
+                <button class="btn btn-primary" style="width:100%" onclick="addRelation()">Add</button>
             </div>
         </div>
     </div>
@@ -328,12 +369,27 @@
                     }
                 } catch(e) {}
 
+                let tagsHtml = "";
+                try {
+                    const tarr = typeof n.tags === 'string' ? JSON.parse(n.tags) : (n.tags || []);
+                    if(Array.isArray(tarr) && tarr.length)
+                        tagsHtml = `<div class="note-anchors">${tarr.map(t=>`<span class="anchor-badge" style="background:rgba(34,197,94,0.1);color:#4ade80">#${t}</span>`).join('')}</div>`;
+                } catch(e) {}
+
+                const conf = n.confidence != null ? parseFloat(n.confidence) : null;
+                const confHtml = conf != null ? `<span style="font-size:0.7rem;color:${conf>=0.8?'#4ade80':conf>=0.6?'#fbbf24':'#f87171'}">${(conf*100).toFixed(0)}% conf</span>` : '';
+                const methodHtml = n.extraction_method ? `<span style="font-size:0.65rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${n.extraction_method}</span>` : '';
+
                 return `
-                <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}">
-                    <span class="cat-tag">${n.kind}</span>
+                <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}" style="cursor:pointer" onclick="openCard('${n.card_id}')" title="Click for details">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+                        <span class="cat-tag" style="margin-bottom:0">${n.kind}</span>
+                        <div style="display:flex;gap:6px;align-items:center">${confHtml}${methodHtml}</div>
+                    </div>
                     <h3 class="note-title">${n.title || 'Untitled'}</h3>
                     <div class="note-content">${n.body}</div>
                     ${anchorsHtml}
+                    ${tagsHtml}
                     <div class="note-footer">
                         <span>📄 ${n.doc_id || 'Unknown'}</span>
                         <span style="color:var(--primary); font-weight:bold;">🔖 Page: ${n.span_hint || '-'}</span>
@@ -404,23 +460,191 @@
         function exportData(type) { window.location.href = `${API_URL}/notes/export/${type}`; }
         async function clearVault() { if(confirm("Wipe all data?")) { await req('/notes/clear-all', {method:'DELETE'}); fetchData(); } }
         
+        // ── VIEW SWITCHER ────────────────────────────────────────────────────
+        const VIEWS = ['dashboard', 'eval', 'graph'];
+        function switchView(view) {
+            document.querySelector('.main:not(#evalPanel):not(#graphPanel)').style.display = view === 'dashboard' ? 'block' : 'none';
+            document.getElementById('evalPanel').style.display  = view === 'eval'  ? 'block' : 'none';
+            document.getElementById('graphPanel').style.display = view === 'graph' ? 'block' : 'none';
+            VIEWS.forEach(v => document.getElementById('nav' + v.charAt(0).toUpperCase() + v.slice(1))?.classList.toggle('active', v === view));
+            if (view === 'eval')  loadEvalData();
+            if (view === 'graph') loadGraph();
+        }
+
+        // ── CARD DETAIL MODAL ────────────────────────────────────────────────
+        const KIND_COLOR = { definition:'#818cf8', theorem:'#f87171', lemma:'#fbbf24',
+                             example:'#4ade80', question:'#c084fc', note:'#94a3b8', summary:'#38bdf8' };
+
+        async function openCard(cardId) {
+            const note = allNotes.find(n => n.card_id === cardId);
+            if (!note) return;
+            const relRes  = await req(`/relations?card_id=${encodeURIComponent(cardId)}`);
+            const relData = await relRes.json();
+
+            let anchorsHtml = '', tagsHtml = '', relHtml = '';
+            try { anchorsHtml = JSON.parse(note.anchors||'[]').map(a=>`<span class="anchor-badge">#${a}</span>`).join(''); } catch(e){}
+            try { tagsHtml = JSON.parse(note.tags||'[]').map(t=>`<span class="anchor-badge" style="background:rgba(34,197,94,0.1);color:#4ade80">#${t}</span>`).join(''); } catch(e){}
+
+            if (relData.length) {
+                relHtml = relData.map(r => {
+                    const isSource = r.source_card_id === cardId;
+                    const other = isSource ? r.target_card_id : r.source_card_id;
+                    const arrow = isSource ? '→' : '←';
+                    const otherNote = allNotes.find(n => n.card_id === other);
+                    const otherTitle = otherNote ? otherNote.title : other;
+                    const byBadge = r.created_by === 'auto'
+                        ? '<span style="font-size:0.65rem;color:#fbbf24;background:rgba(245,158,11,0.1);padding:2px 6px;border-radius:4px;">auto</span>'
+                        : '<span style="font-size:0.65rem;color:#4ade80;background:rgba(34,197,94,0.1);padding:2px 6px;border-radius:4px;">user</span>';
+                    return `<div style="display:flex;align-items:center;gap:8px;padding:0.6rem 0;border-bottom:1px solid var(--border);">
+                        <span style="color:var(--primary);font-weight:700;">${arrow}</span>
+                        <span style="color:#94a3b8;font-size:0.8rem;background:rgba(99,102,241,0.1);padding:2px 8px;border-radius:6px;">${r.relation_type}</span>
+                        <span style="cursor:pointer;color:var(--text)" onclick="closeModal();openCard('${other}')">${otherTitle}</span>
+                        ${byBadge}
+                        <button onclick="deleteRelAndRefresh(${r.id},'${cardId}')" style="margin-left:auto;background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.8rem;">✕</button>
+                    </div>`;
+                }).join('');
+            } else {
+                relHtml = '<span style="color:var(--text-muted);font-size:0.85rem;">No relations yet. Use Auto-Suggest or add one manually.</span>';
+            }
+
+            const conf = note.confidence != null ? `${(parseFloat(note.confidence)*100).toFixed(0)}%` : '—';
+            document.getElementById('modalContent').innerHTML = `
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;">
+                    <span style="background:${KIND_COLOR[note.kind]||'#6366f1'}22;color:${KIND_COLOR[note.kind]||'#6366f1'};padding:4px 14px;border-radius:20px;font-size:0.75rem;font-weight:800;text-transform:uppercase;">${note.kind}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">📄 ${note.doc_id||'—'}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">🔖 Page ${note.span_hint||'—'}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">conf: ${conf}</span>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">${note.extraction_method||'llm'}</span>
+                </div>
+                <h2 style="font-size:1.4rem;margin-bottom:1rem;">${note.title||'Untitled'}</h2>
+                <p style="color:#cbd5e1;line-height:1.8;margin-bottom:1.5rem;">${note.body||''}</p>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.5rem;">${anchorsHtml}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;">${tagsHtml}</div>
+                <h3 style="font-size:1rem;margin-bottom:0.8rem;color:var(--text-muted);">Related Cards</h3>
+                <div>${relHtml}</div>`;
+
+            document.getElementById('cardModal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('cardModal').style.display = 'none'; }
+        document.getElementById('cardModal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+
+        async function deleteRelAndRefresh(relId, cardId) {
+            await req(`/relations/${relId}`, {method:'DELETE'});
+            openCard(cardId);
+        }
+
+        // ── GRAPH ────────────────────────────────────────────────────────────
+        let visNetwork = null;
+
+        async function loadGraph() {
+            const [notesRes, relsRes] = await Promise.all([req('/notes'), req('/relations')]);
+            const notes = await notesRes.json();
+            const rels  = await relsRes.json();
+
+            const nodeMap = {};
+            notes.filter(n => n.kind !== 'summary').forEach(n => {
+                nodeMap[n.card_id] = n;
+            });
+
+            const involvedIds = new Set(rels.flatMap(r => [r.source_card_id, r.target_card_id]));
+            const nodes = [...involvedIds].filter(id => nodeMap[id]).map(id => {
+                const n = nodeMap[id];
+                const color = KIND_COLOR[n.kind] || '#6366f1';
+                return { id, label: (n.title||id).slice(0,30), title: `[${n.kind}] ${n.title}`,
+                         color: {background: color+'33', border: color, highlight:{background:color+'55',border:color}},
+                         font: {color:'#f1f5f9', size:12}, shape:'box', margin:8 };
+            });
+
+            const REL_COLORS = { related_to:'#6366f1', depends_on:'#f87171', example_of:'#4ade80', uses:'#fbbf24', generalizes:'#c084fc' };
+            const edges = rels.map(r => ({
+                id: r.id, from: r.source_card_id, to: r.target_card_id,
+                label: r.relation_type,
+                arrows: { to: { enabled:true, scaleFactor:0.7 } },
+                color: { color: REL_COLORS[r.relation_type]||'#94a3b8', opacity:0.8, highlight:'#ffffff' },
+                font: { color:'#cbd5e1', size:11, background:'#1e293b', strokeWidth:0, align:'middle' },
+                dashes: r.created_by === 'auto',
+                width: 1.5,
+                selectionWidth: 2.5,
+            }));
+
+            const container = document.getElementById('graphContainer');
+            if (visNetwork) visNetwork.destroy();
+            visNetwork = new vis.Network(container,
+                { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
+                {
+                    physics: {
+                        solver: 'repulsion',
+                        repulsion: { nodeDistance: 200, springLength: 250, springConstant: 0.03, damping: 0.15 },
+                        stabilization: { iterations: 200, updateInterval: 25 },
+                    },
+                    interaction: { hover: true, tooltipDelay: 150, zoomView: true, dragView: true },
+                    edges: { smooth: { type: 'dynamic' } },
+                    nodes: { borderWidth: 2, borderWidthSelected: 3 },
+                    layout: { improvedLayout: true },
+                }
+            );
+            visNetwork.on('click', params => {
+                if (params.nodes.length) openCard(params.nodes[0]);
+            });
+            visNetwork.once('stabilized', () => visNetwork.fit({ animation: { duration:600, easingFunction:'easeInOutQuad' } }));
+
+            document.getElementById('graphStats').textContent = `${nodes.length} nodes · ${edges.length} edges`;
+            renderRelationsList(rels, nodeMap);
+        }
+
+        function renderRelationsList(rels, nodeMap) {
+            const REL_COLORS = { related_to:'#818cf8', depends_on:'#f87171', example_of:'#4ade80', uses:'#fbbf24', generalizes:'#c084fc' };
+            const el = document.getElementById('relationsList');
+            if (!rels.length) { el.innerHTML = '<span style="color:var(--text-muted)">No relations yet.</span>'; return; }
+            el.innerHTML = rels.slice(0, 50).map(r => {
+                const src = nodeMap[r.source_card_id]?.title || r.source_card_id.slice(-8);
+                const tgt = nodeMap[r.target_card_id]?.title || r.target_card_id.slice(-8);
+                const col = REL_COLORS[r.relation_type] || '#94a3b8';
+                const dash = r.created_by === 'auto' ? 'opacity:0.6' : '';
+                return `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);${dash}">
+                    <div style="font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <span style="color:#f1f5f9">${src.slice(0,18)}</span>
+                        <span style="color:${col};margin:0 6px">→ ${r.relation_type} →</span>
+                        <span style="color:#f1f5f9">${tgt.slice(0,18)}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-top:3px;">
+                        <span style="font-size:0.65rem;color:var(--text-muted)">${r.created_by}</span>
+                        <button onclick="deleteRelFromGraph(${r.id})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:0.75rem;">✕</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function runAutoSuggest() {
+            const btn = event.target;
+            btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+            const r = await req('/relations/auto-suggest', {method:'POST'});
+            const d = await r.json();
+            btn.disabled = false; btn.textContent = '⚡ Auto-Suggest Relations';
+            await loadGraph();
+            alert(`${d.count} relation(s) suggested.`);
+        }
+
+        async function addRelation() {
+            const src  = document.getElementById('relSrc').value.trim();
+            const type = document.getElementById('relType').value;
+            const tgt  = document.getElementById('relTgt').value.trim();
+            if (!src || !tgt) return alert('Both card IDs are required.');
+            await req('/relations', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({source_card_id:src, target_card_id:tgt, relation_type:type}) });
+            document.getElementById('relSrc').value = '';
+            document.getElementById('relTgt').value = '';
+            loadGraph();
+        }
+
+        async function deleteRelFromGraph(relId) {
+            await req(`/relations/${relId}`, {method:'DELETE'});
+            loadGraph();
+        }
+
         // ── EVAL ────────────────────────────────────────────────────────────
         let evalNotes = [], evalVerdicts = {};
-
-        function switchView(view) {
-            const dashboard = document.querySelector('.main:not(#evalPanel)');
-            const evalPanel = document.getElementById('evalPanel');
-            document.getElementById('navDashboard').classList.toggle('active', view === 'dashboard');
-            document.getElementById('navEval').classList.toggle('active', view === 'eval');
-            if (view === 'eval') {
-                dashboard.style.display = 'none';
-                evalPanel.style.display = 'block';
-                loadEvalData();
-            } else {
-                dashboard.style.display = 'block';
-                evalPanel.style.display = 'none';
-            }
-        }
 
         async function loadEvalData() {
             try {

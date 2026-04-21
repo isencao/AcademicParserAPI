@@ -1,27 +1,33 @@
 import sqlite3
 import json
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+RELATION_TYPES = {"related_to", "depends_on", "example_of", "uses", "generalizes"}
 
 class IDocumentRepository(ABC):
     @abstractmethod
     def init_db(self) -> None: pass
-    
+
     @abstractmethod
-    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str) -> None: pass
-    
+    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str,
+                  tags: str = "[]", confidence: float = 1.0, extraction_method: str = "llm") -> None: pass
+
     @abstractmethod
     def get_all_notes(self) -> List[Dict[str, Any]]: pass
-    
+
+    @abstractmethod
+    def get_note_by_card_id(self, card_id: str) -> Optional[Dict[str, Any]]: pass
+
     @abstractmethod
     def get_stats(self) -> Dict[str, int]: pass
-    
+
     @abstractmethod
     def clear_database(self) -> None: pass
-    
+
     @abstractmethod
     def is_file_processed(self, file_hash: str) -> bool: pass
-    
+
     @abstractmethod
     def mark_file_processed(self, file_hash: str, filename: str) -> None: pass
 
@@ -30,6 +36,18 @@ class IDocumentRepository(ABC):
 
     @abstractmethod
     def get_analytics(self) -> List[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def add_relation(self, source_card_id: str, target_card_id: str, relation_type: str, created_by: str = "user") -> int: pass
+
+    @abstractmethod
+    def get_relations(self, card_id: Optional[str] = None) -> List[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def delete_relation(self, relation_id: int) -> None: pass
+
+    @abstractmethod
+    def clear_auto_relations(self) -> None: pass
 
 class SQLiteDocumentRepository(IDocumentRepository):
     def __init__(self, db_path: str = "academic_notes.db"):
@@ -44,7 +62,6 @@ class SQLiteDocumentRepository(IDocumentRepository):
     def init_db(self) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # Final Şeması: Tüm akademik alanlar mevcut
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS notes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,8 +71,33 @@ class SQLiteDocumentRepository(IDocumentRepository):
                     title TEXT,
                     body TEXT,
                     anchors TEXT,
-                    span_hint TEXT, 
+                    tags TEXT,
+                    span_hint TEXT,
+                    confidence REAL DEFAULT 1.0,
+                    extraction_method TEXT DEFAULT 'llm',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            # Migration: add new columns to existing databases
+            for col, definition in [
+                ("tags", "TEXT"),
+                ("confidence", "REAL DEFAULT 1.0"),
+                ("extraction_method", "TEXT DEFAULT 'llm'"),
+            ]:
+                try:
+                    cursor.execute(f"ALTER TABLE notes ADD COLUMN {col} {definition}")
+                except Exception:
+                    pass
+
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS card_relations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_card_id TEXT NOT NULL,
+                    target_card_id TEXT NOT NULL,
+                    relation_type TEXT NOT NULL,
+                    created_by TEXT DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(source_card_id, target_card_id, relation_type)
                 )
             ''')
             cursor.execute('''
@@ -77,12 +119,14 @@ class SQLiteDocumentRepository(IDocumentRepository):
             ''')
             conn.commit()
 
-    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str) -> None:
+    def save_note(self, card_id: str, doc_id: str, kind: str, title: str, body: str, anchors: str, span_hint: str,
+                  tags: str = "[]", confidence: float = 1.0, extraction_method: str = "llm") -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO notes (card_id, doc_id, kind, title, body, anchors, span_hint) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                (card_id, doc_id, kind, title, body, anchors, span_hint)
+                "INSERT INTO notes (card_id, doc_id, kind, title, body, anchors, span_hint, tags, confidence, extraction_method) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (card_id, doc_id, kind, title, body, anchors, span_hint, tags, confidence, extraction_method)
             )
             conn.commit()
 
@@ -92,6 +136,13 @@ class SQLiteDocumentRepository(IDocumentRepository):
             cursor.execute("SELECT * FROM notes ORDER BY id DESC")
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def get_note_by_card_id(self, card_id: str) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM notes WHERE card_id = ?", (card_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def get_stats(self) -> Dict[str, int]:
         with self._get_connection() as conn:
@@ -138,6 +189,38 @@ class SQLiteDocumentRepository(IDocumentRepository):
             cursor.execute("SELECT * FROM analytics_log ORDER BY id DESC")
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def add_relation(self, source_card_id: str, target_card_id: str, relation_type: str, created_by: str = "user") -> int:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO card_relations (source_card_id, target_card_id, relation_type, created_by) VALUES (?,?,?,?)",
+                (source_card_id, target_card_id, relation_type, created_by)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_relations(self, card_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if card_id:
+                cursor.execute(
+                    "SELECT * FROM card_relations WHERE source_card_id=? OR target_card_id=? ORDER BY id DESC",
+                    (card_id, card_id)
+                )
+            else:
+                cursor.execute("SELECT * FROM card_relations ORDER BY id DESC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def delete_relation(self, relation_id: int) -> None:
+        with self._get_connection() as conn:
+            conn.cursor().execute("DELETE FROM card_relations WHERE id=?", (relation_id,))
+            conn.commit()
+
+    def clear_auto_relations(self) -> None:
+        with self._get_connection() as conn:
+            conn.cursor().execute("DELETE FROM card_relations WHERE created_by='auto'")
+            conn.commit()
 
 def get_db_repository() -> IDocumentRepository:
     return SQLiteDocumentRepository()

@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from database import get_db_repository, IDocumentRepository
 
 # Güncel servis fonksiyonlarını içeri aktarıyoruz
-from services import process_file_in_batches, chat_with_notes
+from services import process_file_in_batches, chat_with_notes, auto_suggest_relations
+from database import RELATION_TYPES
 
 logger = logging.getLogger("MainServer")
 router = APIRouter()
@@ -22,6 +23,11 @@ progress_store: Dict[str, Any] = {}
 
 class ChatRequest(BaseModel):
     message: str
+
+class RelationRequest(BaseModel):
+    source_card_id: str
+    target_card_id: str
+    relation_type: str
 
 def get_file_hash(filepath: str) -> str:
     """Dosya içeriğine göre benzersiz bir MD5 hash üretir."""
@@ -44,15 +50,20 @@ def background_processor(temp_path: str, filename: str, target_lang: str, task_i
         for note in notes:
             anchors_list = note.get("anchors", [])
             anchors_str = json.dumps(anchors_list) if isinstance(anchors_list, list) else str(anchors_list)
-            
+            tags_list = note.get("tags", [])
+            tags_str = json.dumps(tags_list) if isinstance(tags_list, list) else str(tags_list)
+
             db.save_note(
                 card_id=note.get("card_id", f"{uuid.uuid4().hex[:8]}"),
-                doc_id=filename,  # UUID yerine gerçek dosya adı
+                doc_id=filename,
                 kind=note.get("kind", "note"),
                 title=note.get("title", "Untitled"),
                 body=note.get("body", ""),
                 anchors=anchors_str,
-                span_hint=note.get("span_hint", "-")
+                span_hint=note.get("span_hint", "-"),
+                tags=tags_str,
+                confidence=note.get("confidence", 1.0),
+                extraction_method=note.get("extraction_method", "llm"),
             )
             
         # Cache ve analitik kayıtları
@@ -195,6 +206,33 @@ def export_md_file(db: IDocumentRepository = Depends(get_db_repository)):
             f.write(f"*Source: {source}*\n\n---\n\n")
             
     return FileResponse(file_path, media_type="text/markdown", filename="academic_report.md")
+
+@router.get("/api/relations")
+def get_all_relations(card_id: str = None, db: IDocumentRepository = Depends(get_db_repository)):
+    return db.get_relations(card_id)
+
+@router.post("/api/relations")
+def add_relation(req: RelationRequest, db: IDocumentRepository = Depends(get_db_repository)):
+    if req.relation_type not in RELATION_TYPES:
+        raise HTTPException(status_code=400, detail=f"relation_type must be one of {RELATION_TYPES}")
+    if req.source_card_id == req.target_card_id:
+        raise HTTPException(status_code=400, detail="source and target cannot be the same card")
+    db.add_relation(req.source_card_id, req.target_card_id, req.relation_type, created_by="user")
+    return {"message": "Relation added."}
+
+@router.delete("/api/relations/{relation_id}")
+def delete_relation(relation_id: int, db: IDocumentRepository = Depends(get_db_repository)):
+    db.delete_relation(relation_id)
+    return {"message": "Relation deleted."}
+
+@router.post("/api/relations/auto-suggest")
+def auto_suggest(db: IDocumentRepository = Depends(get_db_repository)):
+    db.clear_auto_relations()
+    notes = db.get_all_notes()
+    suggestions = auto_suggest_relations(notes)
+    for s in suggestions:
+        db.add_relation(s["source_card_id"], s["target_card_id"], s["relation_type"], created_by="auto")
+    return {"message": f"{len(suggestions)} relation(s) suggested.", "count": len(suggestions)}
 
 @router.get("/api/analytics/export/csv")
 def export_analytics_csv(db: IDocumentRepository = Depends(get_db_repository)):
