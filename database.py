@@ -14,6 +14,9 @@ class IDocumentRepository(ABC):
                   tags: str = "[]", confidence: float = 1.0, extraction_method: str = "llm") -> None: pass
 
     @abstractmethod
+    def update_note(self, card_id: str, kind: str, title: str, body: str) -> None: pass
+
+    @abstractmethod
     def get_all_notes(self) -> List[Dict[str, Any]]: pass
 
     @abstractmethod
@@ -127,6 +130,14 @@ class SQLiteDocumentRepository(IDocumentRepository):
                 "INSERT INTO notes (card_id, doc_id, kind, title, body, anchors, span_hint, tags, confidence, extraction_method) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (card_id, doc_id, kind, title, body, anchors, span_hint, tags, confidence, extraction_method)
+            )
+            conn.commit()
+
+    def update_note(self, card_id: str, kind: str, title: str, body: str) -> None:
+        with self._get_connection() as conn:
+            conn.cursor().execute(
+                "UPDATE notes SET kind=?, title=?, body=? WHERE card_id=?",
+                (kind, title, body, card_id)
             )
             conn.commit()
 

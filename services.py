@@ -378,6 +378,7 @@ def auto_suggest_relations(notes: list) -> list[dict]:
     non_summary = [n for n in notes if n.get("kind") != "summary" and n.get("card_id")]
     token_map = {n["card_id"]: parse_tokens(n) for n in non_summary}
     kind_map  = {n["card_id"]: n.get("kind", "") for n in non_summary}
+    doc_map   = {n["card_id"]: n.get("doc_id", "") for n in non_summary}
 
     suggestions: list[dict] = []
     seen: set[tuple] = set()
@@ -391,6 +392,9 @@ def auto_suggest_relations(notes: list) -> list[dict]:
     ids = [n["card_id"] for n in non_summary]
     for i, a in enumerate(ids):
         for b in ids[i+1:]:
+            # Farklı belgelerden gelen kartlar arasında otomatik relation oluşturma
+            if doc_map[a] != doc_map[b]:
+                continue
             shared = token_map[a] & token_map[b]
             ka, kb = kind_map[a], kind_map[b]
             n_shared = len(shared)

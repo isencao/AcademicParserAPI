@@ -214,12 +214,24 @@
                 </div>
             </div>
             <div class="content-area">
-                <div style="display:flex;gap:0.8rem;margin-bottom:1rem;overflow:visible;">
+                <div style="display:flex;gap:0.8rem;margin-bottom:0.8rem;overflow:visible;flex-wrap:wrap;">
                     <input type="text" id="searchInput" placeholder="Search cards..." style="flex:1;min-width:0;padding:0.8rem;background:var(--bg);border:1px solid var(--border);color:white;border-radius:12px;" onkeyup="applyFilters()">
                     <div style="position:relative;flex-shrink:0;">
-                        <input type="text" id="tagInput" placeholder="Filter by tag..." style="width:180px;padding:0.8rem;background:var(--bg);border:1px solid rgba(34,197,94,0.4);color:white;border-radius:12px;" onkeyup="applyFilters()" onfocus="showTagSuggestions()" onblur="setTimeout(hideTagSuggestions,200)">
-                        <div id="tagSuggestBox" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--sidebar);border:1px solid var(--border);border-radius:10px;z-index:100;min-width:180px;max-height:200px;overflow-y:auto;"></div>
+                        <input type="text" id="tagInput" placeholder="Filter by tag..." style="width:160px;padding:0.8rem;background:var(--bg);border:1px solid rgba(34,197,94,0.4);color:white;border-radius:12px;" onkeyup="applyFilters()" onfocus="showTagSuggestions()" onblur="setTimeout(hideTagSuggestions,200)">
+                        <div id="tagSuggestBox" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--sidebar);border:1px solid var(--border);border-radius:10px;z-index:100;min-width:160px;max-height:200px;overflow-y:auto;"></div>
                     </div>
+                    <select id="sortSelect" onchange="applyFilters()" style="background:var(--bg);border:1px solid var(--border);color:white;padding:0.5rem 0.8rem;border-radius:10px;font-size:0.85rem;cursor:pointer;">
+                        <option value="default">Sort: Default</option>
+                        <option value="conf_desc">Confidence ↓</option>
+                        <option value="conf_asc">Confidence ↑</option>
+                        <option value="kind">By Kind</option>
+                    </select>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.8rem;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--text-muted);cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="confFilter" onchange="applyFilters()" style="accent-color:var(--primary);width:14px;height:14px;">
+                        Show only high-confidence cards (≥80%)
+                    </label>
                 </div>
 
                 <div id="tagCloud" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem;min-height:0;"></div>
@@ -474,11 +486,15 @@
         }
 
         function applyFilters() {
-            const q   = document.getElementById('searchInput').value.toLowerCase();
-            const tag = (document.getElementById('tagInput').value || activeTag || '').toLowerCase().trim();
-            const filtered = allNotes.filter(n => {
+            const q          = document.getElementById('searchInput').value.toLowerCase();
+            const tag        = (document.getElementById('tagInput').value || activeTag || '').toLowerCase().trim();
+            const highConf   = document.getElementById('confFilter')?.checked;
+            const sortVal    = document.getElementById('sortSelect')?.value || 'default';
+
+            let filtered = allNotes.filter(n => {
                 const matchKind = currentFilter === 'ALL' || (n.kind||'').toUpperCase() === currentFilter;
                 const matchText = !q || JSON.stringify(n).toLowerCase().includes(q);
+                const matchConf = !highConf || (parseFloat(n.confidence||0) >= 0.8);
                 let matchTag = true;
                 if (tag) {
                     try {
@@ -486,8 +502,13 @@
                         matchTag = tags.some(t => t.toLowerCase().includes(tag));
                     } catch(e) { matchTag = false; }
                 }
-                return matchKind && matchText && matchTag;
+                return matchKind && matchText && matchTag && matchConf;
             });
+
+            if (sortVal === 'conf_desc') filtered.sort((a,b) => (parseFloat(b.confidence)||0) - (parseFloat(a.confidence)||0));
+            else if (sortVal === 'conf_asc') filtered.sort((a,b) => (parseFloat(a.confidence)||0) - (parseFloat(b.confidence)||0));
+            else if (sortVal === 'kind') filtered.sort((a,b) => (a.kind||'').localeCompare(b.kind||''));
+
             renderNotes(filtered);
         }
 
@@ -755,22 +776,64 @@
             }
 
             const conf = note.confidence != null ? `${(parseFloat(note.confidence)*100).toFixed(0)}%` : '—';
+            const kindOptions = ['definition','theorem','lemma','example','question','note','summary']
+                .map(k => `<option value="${k}" ${k===note.kind?'selected':''}>${k}</option>`).join('');
+
             document.getElementById('modalContent').innerHTML = `
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;">
-                    <span style="background:${KIND_COLOR[note.kind]||'#6366f1'}22;color:${KIND_COLOR[note.kind]||'#6366f1'};padding:4px 14px;border-radius:20px;font-size:0.75rem;font-weight:800;text-transform:uppercase;">${note.kind}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);">📄 ${note.doc_id||'—'}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);">🔖 Page ${note.span_hint||'—'}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);">conf: ${conf}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);">${note.extraction_method||'llm'}</span>
+                <div id="viewMode">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;">
+                        <span style="background:${KIND_COLOR[note.kind]||'#6366f1'}22;color:${KIND_COLOR[note.kind]||'#6366f1'};padding:4px 14px;border-radius:20px;font-size:0.75rem;font-weight:800;text-transform:uppercase;">${note.kind}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);">📄 ${note.doc_id||'—'}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);">🔖 Page ${note.span_hint||'—'}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);">conf: ${conf}</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);">${note.extraction_method||'llm'}</span>
+                        <button onclick="toggleEditMode('${note.card_id}')" style="margin-left:auto;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">✏️ Edit</button>
+                    </div>
+                    <h2 style="font-size:1.4rem;margin-bottom:1rem;">${note.title||'Untitled'}</h2>
+                    <p style="color:#cbd5e1;line-height:1.8;margin-bottom:1.5rem;">${note.body||''}</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.5rem;">${anchorsHtml}</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;">${tagsHtml}</div>
+                    <h3 style="font-size:1rem;margin-bottom:0.8rem;color:var(--text-muted);">Related Cards</h3>
+                    <div>${relHtml}</div>
                 </div>
-                <h2 style="font-size:1.4rem;margin-bottom:1rem;">${note.title||'Untitled'}</h2>
-                <p style="color:#cbd5e1;line-height:1.8;margin-bottom:1.5rem;">${note.body||''}</p>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.5rem;">${anchorsHtml}</div>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1.5rem;">${tagsHtml}</div>
-                <h3 style="font-size:1rem;margin-bottom:0.8rem;color:var(--text-muted);">Related Cards</h3>
-                <div>${relHtml}</div>`;
+                <div id="editMode" style="display:none;">
+                    <h3 style="margin-bottom:1.2rem;color:var(--text-muted);font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;">Edit Card</h3>
+                    <div style="margin-bottom:1rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Kind</label>
+                        <select id="editKind" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.6rem;border-radius:8px;">${kindOptions}</select>
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Title</label>
+                        <input id="editTitle" value="${(note.title||'').replace(/"/g,'&quot;')}" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.6rem;border-radius:8px;box-sizing:border-box;">
+                    </div>
+                    <div style="margin-bottom:1.5rem;">
+                        <label style="font-size:0.8rem;color:var(--text-muted);display:block;margin-bottom:4px;">Body</label>
+                        <textarea id="editBody" rows="8" style="width:100%;background:var(--bg);border:1px solid var(--border);color:white;padding:0.6rem;border-radius:8px;box-sizing:border-box;resize:vertical;font-family:inherit;line-height:1.6;">${note.body||''}</textarea>
+                    </div>
+                    <div style="display:flex;gap:0.8rem;">
+                        <button onclick="saveCard('${note.card_id}')" style="background:var(--primary);color:white;border:none;padding:0.6rem 1.5rem;border-radius:8px;cursor:pointer;font-weight:600;">💾 Save</button>
+                        <button onclick="toggleEditMode(null)" style="background:rgba(255,255,255,0.05);color:var(--text-muted);border:1px solid var(--border);padding:0.6rem 1.2rem;border-radius:8px;cursor:pointer;">Cancel</button>
+                    </div>
+                </div>`;
 
             document.getElementById('cardModal').style.display = 'flex';
+        }
+
+        function toggleEditMode(cardId) {
+            const view = document.getElementById('viewMode');
+            const edit = document.getElementById('editMode');
+            if (cardId) { view.style.display='none'; edit.style.display='block'; }
+            else        { view.style.display='block'; edit.style.display='none'; }
+        }
+
+        async function saveCard(cardId) {
+            const kind  = document.getElementById('editKind').value;
+            const title = document.getElementById('editTitle').value.trim();
+            const body  = document.getElementById('editBody').value.trim();
+            if (!title) return alert('Title cannot be empty.');
+            await req(`/notes/${cardId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind, title, body}) });
+            await fetchData();
+            openCard(cardId);
         }
 
         function closeModal() { document.getElementById('cardModal').style.display = 'none'; }

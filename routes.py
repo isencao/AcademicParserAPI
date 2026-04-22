@@ -24,6 +24,11 @@ progress_store: Dict[str, Any] = {}
 class ChatRequest(BaseModel):
     message: str
 
+class NoteUpdateRequest(BaseModel):
+    kind: str
+    title: str
+    body: str
+
 class RelationRequest(BaseModel):
     source_card_id: str
     target_card_id: str
@@ -327,6 +332,15 @@ async def load_demo(background_tasks: BackgroundTasks, db: IDocumentRepository =
 
     background_tasks.add_task(run_demo)
     return {"task_id": task_id, "message": "Demo loading started.", "files": doc_files}
+
+@router.put("/api/notes/{card_id}")
+def update_note(card_id: str, req: NoteUpdateRequest, db: IDocumentRepository = Depends(get_db_repository)):
+    """Kart içeriğini günceller."""
+    valid_kinds = {"definition","theorem","lemma","example","question","note","summary"}
+    if req.kind not in valid_kinds:
+        raise HTTPException(status_code=400, detail=f"Invalid kind. Must be one of {valid_kinds}")
+    db.update_note(card_id, req.kind, req.title, req.body)
+    return {"message": "Card updated."}
 
 @router.get("/api/relations")
 def get_all_relations(card_id: str = None, db: IDocumentRepository = Depends(get_db_repository)):
