@@ -237,8 +237,13 @@ TEXT:
         return extracted_notes, used_tokens
 
     except Exception as e:
+        is_rate_limit = "429" in str(e) or "rate_limit" in str(e).lower()
         logger.warning(f"GROQ unavailable ({e}), falling back to rule-based extraction.")
-        return rule_based_extract(text), 0
+        result = rule_based_extract(text)
+        if is_rate_limit:
+            for card in result:
+                card["_rate_limited"] = True
+        return result, 0
 
 def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress_dict=None, task_id=None):
     all_notes = []

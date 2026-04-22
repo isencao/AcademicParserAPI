@@ -74,11 +74,13 @@ def background_processor(temp_path: str, filename: str, target_lang: str, task_i
         
         db.mark_file_processed(file_hash, filename)
         db.log_performance(filename, total_pages, process_time_sec, total_tokens)
-        
+
+        rate_limited = any(n.get("_rate_limited") for n in notes)
         progress_store[task_id].update({
-            "percent": 100, 
-            "message": "Processing completed successfully!", 
-            "status": "completed"
+            "percent": 100,
+            "message": "Processing completed successfully!",
+            "status": "completed",
+            "rate_limited": rate_limited,
         })
         logger.info(f"✅ Task completed successfully: {filename}")
         
@@ -332,6 +334,11 @@ async def load_demo(background_tasks: BackgroundTasks, db: IDocumentRepository =
 
     background_tasks.add_task(run_demo)
     return {"task_id": task_id, "message": "Demo loading started.", "files": doc_files}
+
+@router.delete("/api/notes/{card_id}")
+def delete_note(card_id: str, db: IDocumentRepository = Depends(get_db_repository)):
+    db.delete_note(card_id)
+    return {"message": "Card deleted."}
 
 @router.put("/api/notes/{card_id}")
 def update_note(card_id: str, req: NoteUpdateRequest, db: IDocumentRepository = Depends(get_db_repository)):

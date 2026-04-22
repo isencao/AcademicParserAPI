@@ -17,6 +17,9 @@ class IDocumentRepository(ABC):
     def update_note(self, card_id: str, kind: str, title: str, body: str) -> None: pass
 
     @abstractmethod
+    def delete_note(self, card_id: str) -> None: pass
+
+    @abstractmethod
     def get_all_notes(self) -> List[Dict[str, Any]]: pass
 
     @abstractmethod
@@ -139,6 +142,11 @@ class SQLiteDocumentRepository(IDocumentRepository):
                 "UPDATE notes SET kind=?, title=?, body=? WHERE card_id=?",
                 (kind, title, body, card_id)
             )
+            conn.commit()
+
+    def delete_note(self, card_id: str) -> None:
+        with self._get_connection() as conn:
+            conn.cursor().execute("DELETE FROM notes WHERE card_id=?", (card_id,))
             conn.commit()
 
     def get_all_notes(self) -> List[Dict[str, Any]]:

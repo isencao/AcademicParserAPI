@@ -102,8 +102,10 @@
         .stat-card-value { font-size: 2rem; font-weight: 800; line-height: 1; }
         .stat-card-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
-        #progressContainer { width: 100%; margin-top: 1rem; background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; display: none; }
-        #progressBar { width: 0%; height: 6px; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: 0.4s; }
+        #dropZone.drag-over { border-color: var(--primary); background: rgba(99,102,241,0.08); }
+        .file-progress { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.5rem 0.8rem; margin-bottom: 0.4rem; font-size: 0.8rem; }
+        .file-progress-bar-wrap { height: 4px; background: rgba(255,255,255,0.08); border-radius: 4px; margin-top: 4px; overflow: hidden; }
+        .file-progress-bar { height: 4px; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 4px; transition: width 0.4s; }
 
         /* CHAT */
         .chat-widget { position: fixed; bottom: 30px; right: 30px; z-index: 1000; }
@@ -179,22 +181,28 @@
     </div>
     
     <div class="main">
-        <div class="glass-panel controls">
-            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md" style="font-size: 0.8rem; color: var(--text-muted);">
-            <select id="langSelect" style="background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.5rem; border-radius: 8px;">
-                <option value="auto">Auto Detect</option>
-                <option value="tr">Turkish</option>
-                <option value="en">English</option>
-            </select>
-            <button class="btn btn-primary" onclick="uploadFiles()">🚀 Analyze</button>
-            <div style="flex-grow: 1;"></div>
-            <button class="btn btn-success" onclick="exportData('csv')">Export CSV</button>
-            <button class="btn btn-purple" onclick="exportData('md')">Export MD</button>
-            <button class="btn btn-danger" onclick="clearVault()">Clear Vault</button>
-            
-            <div id="progressContainer">
-                <div id="progressBar"></div>
-                <div id="progressText" style="font-size: 0.7rem; color: var(--text-muted); padding: 5px 10px;">Ready</div>
+        <div class="glass-panel">
+            <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">
+                <select id="langSelect" style="background:var(--bg);border:1px solid var(--border);color:white;padding:0.5rem 0.8rem;border-radius:8px;font-size:0.85rem;">
+                    <option value="auto">Auto Detect</option>
+                    <option value="tr">Turkish</option>
+                    <option value="en">English</option>
+                </select>
+                <div style="flex-grow:1;"></div>
+                <button class="btn btn-success" onclick="exportData('csv')">Export CSV</button>
+                <button class="btn btn-purple" onclick="exportData('md')">Export MD</button>
+                <button class="btn btn-danger" onclick="clearVault()">Clear Vault</button>
+            </div>
+            <div id="dropZone" onclick="document.getElementById('fileInput').click()"
+                style="border:2px dashed rgba(99,102,241,0.4);border-radius:14px;padding:1.8rem;text-align:center;cursor:pointer;transition:0.3s;background:rgba(99,102,241,0.03);">
+                <div style="font-size:1.8rem;margin-bottom:0.4rem;">📂</div>
+                <div style="color:var(--text-muted);font-size:0.9rem;">Drag & drop PDF, TXT or MD files here, or <span style="color:var(--primary);font-weight:600;">click to browse</span></div>
+                <div id="dropFileList" style="margin-top:0.6rem;font-size:0.8rem;color:#4ade80;"></div>
+            </div>
+            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.md" style="display:none;" onchange="updateDropLabel()">
+            <div id="multiProgressContainer" style="margin-top:0.8rem;display:none;"></div>
+            <div id="rateLimitBanner" style="display:none;margin-top:0.8rem;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:10px;padding:0.6rem 1rem;font-size:0.82rem;color:#fbbf24;">
+                ⚠️ Groq API rate limit reached — cards extracted using rule-based fallback (lower accuracy).
             </div>
         </div>
         
@@ -509,7 +517,7 @@
             else if (sortVal === 'conf_asc') filtered.sort((a,b) => (parseFloat(a.confidence)||0) - (parseFloat(b.confidence)||0));
             else if (sortVal === 'kind') filtered.sort((a,b) => (a.kind||'').localeCompare(b.kind||''));
 
-            renderNotes(filtered);
+            renderNotes(filtered, q);
         }
 
         function updateTabCounts() {
@@ -570,6 +578,15 @@
 
         const KIND_COLORS = { definition:'#818cf8', theorem:'#f87171', lemma:'#fbbf24', example:'#4ade80', question:'#c084fc', note:'#94a3b8', summary:'#38bdf8' };
 
+        function highlight(text, query) {
+            if (!query || query.length < 2) return text;
+            try {
+                const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return text.replace(new RegExp(`(${escaped})`, 'gi'),
+                    '<mark style="background:rgba(251,191,36,0.35);color:#fbbf24;border-radius:3px;padding:0 2px;">$1</mark>');
+            } catch { return text; }
+        }
+
         function showSkeleton() {
             const container = document.getElementById('notesContainer');
             container.innerHTML = Array(6).fill(0).map(() => `
@@ -582,7 +599,7 @@
                 </div>`).join('');
         }
 
-        function renderNotes(notes) {
+        function renderNotes(notes, q = '') {
             const container = document.getElementById('notesContainer');
             if(!notes.length) return container.innerHTML = `
                 <div style="grid-column:1/-1;text-align:center;padding:4rem 2rem;opacity:0.6;">
@@ -618,8 +635,8 @@
                         <span class="cat-tag" style="margin-bottom:0;color:${KIND_COLORS[n.kind]||'#818cf8'}">${n.kind}</span>
                         <div style="display:flex;gap:6px;align-items:center">${confHtml}${methodHtml}</div>
                     </div>
-                    <h3 class="note-title">${n.title || 'Untitled'}</h3>
-                    <div class="note-content">${n.body}</div>
+                    <h3 class="note-title">${highlight(n.title || 'Untitled', q)}</h3>
+                    <div class="note-content">${highlight(n.body || '', q)}</div>
                     ${anchorsHtml}
                     ${tagsHtml}
                     <div class="note-footer">
@@ -630,44 +647,77 @@
             }).join('');
         }
 
-        async function uploadFiles() {
+        function updateDropLabel() {
             const files = document.getElementById('fileInput').files;
-            if(!files.length) return;
-            
-            const lang = document.getElementById('langSelect').value;
-            const container = document.getElementById('progressContainer');
-            const bar = document.getElementById('progressBar');
-            const txt = document.getElementById('progressText');
-            
-            container.style.display = 'block';
-            
-            for(let f of files) {
-                const fd = new FormData();
-                fd.append('file', f);
-                txt.innerText = `Uploading: ${f.name}`;
-                
-                try {
-                    const r = await req(`/notes/upload?target_lang=${lang}`, { method: 'POST', body: fd });
-                    const data = await r.json();
-                    await poll(data.task_id, bar, txt);
-                } catch(e) { txt.innerText = "Error uploading file."; }
-            }
-            
-            setTimeout(() => { container.style.display = 'none'; fetchData(); }, 2000);
+            document.getElementById('dropFileList').textContent =
+                files.length ? `${files.length} file(s) selected: ${[...files].map(f=>f.name).join(', ')}` : '';
         }
 
-        async function poll(id, bar, txt) {
+        // Drag & drop handlers
+        const dz = document.getElementById('dropZone');
+        dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+        dz.addEventListener('dragleave', ()  => dz.classList.remove('drag-over'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault(); dz.classList.remove('drag-over');
+            const dt = new DataTransfer();
+            [...e.dataTransfer.files].filter(f => /\.(pdf|txt|md)$/i.test(f.name)).forEach(f => dt.items.add(f));
+            document.getElementById('fileInput').files = dt.files;
+            updateDropLabel();
+            uploadFiles();
+        });
+
+        async function uploadFiles() {
+            const files = document.getElementById('fileInput').files;
+            if (!files.length) return;
+            const lang = document.getElementById('langSelect').value;
+            const mpCont = document.getElementById('multiProgressContainer');
+            document.getElementById('rateLimitBanner').style.display = 'none';
+            mpCont.style.display = 'block';
+            mpCont.innerHTML = '';
+
+            const tasks = [...files].map(f => {
+                const id = `fp_${Math.random().toString(36).slice(2)}`;
+                mpCont.innerHTML += `<div class="file-progress" id="${id}">
+                    <span style="color:var(--text)">${f.name}</span>
+                    <span id="${id}_msg" style="float:right;color:var(--text-muted)">Uploading...</span>
+                    <div class="file-progress-bar-wrap"><div class="file-progress-bar" id="${id}_bar" style="width:0%"></div></div>
+                </div>`;
+                return { file: f, domId: id };
+            });
+
+            let anyRateLimited = false;
+            await Promise.all(tasks.map(async ({ file, domId }) => {
+                try {
+                    const fd = new FormData(); fd.append('file', file);
+                    const r = await req(`/notes/upload?target_lang=${lang}`, { method:'POST', body:fd });
+                    const data = await r.json();
+                    const rl = await pollMulti(data.task_id, domId);
+                    if (rl) anyRateLimited = true;
+                } catch(e) {
+                    document.getElementById(`${domId}_msg`).textContent = '❌ Error';
+                }
+            }));
+
+            if (anyRateLimited) document.getElementById('rateLimitBanner').style.display = 'block';
+            setTimeout(() => { mpCont.style.display = 'none'; fetchData(); loadAnalytics(); }, 2000);
+        }
+
+        async function pollMulti(taskId, domId) {
             return new Promise(resolve => {
-                const interval = setInterval(async () => {
-                    const r = await fetch(`${API_URL}/notes/progress/${id}`);
-                    const d = await r.json();
-                    bar.style.width = `${d.percent}%`;
-                    txt.innerText = d.message;
-                    if(d.status === 'completed' || d.status === 'error') {
-                        clearInterval(interval);
-                        resolve();
-                    }
-                }, 2000);
+                const bar = document.getElementById(`${domId}_bar`);
+                const msg = document.getElementById(`${domId}_msg`);
+                const iv = setInterval(async () => {
+                    try {
+                        const r = await fetch(`${API_URL}/notes/progress/${taskId}`);
+                        const d = await r.json();
+                        if (bar) bar.style.width = `${d.percent}%`;
+                        if (msg) msg.textContent = d.percent < 100 ? `${d.percent}%` : (d.status === 'error' ? '❌ Error' : '✅ Done');
+                        if (d.status === 'completed' || d.status === 'error') {
+                            clearInterval(iv);
+                            resolve(d.rate_limited || false);
+                        }
+                    } catch { clearInterval(iv); resolve(false); }
+                }, 1500);
             });
         }
 
@@ -787,7 +837,10 @@
                         <span style="font-size:0.75rem;color:var(--text-muted);">🔖 Page ${note.span_hint||'—'}</span>
                         <span style="font-size:0.75rem;color:var(--text-muted);">conf: ${conf}</span>
                         <span style="font-size:0.75rem;color:var(--text-muted);">${note.extraction_method||'llm'}</span>
-                        <button onclick="toggleEditMode('${note.card_id}')" style="margin-left:auto;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">✏️ Edit</button>
+                        <div style="margin-left:auto;display:flex;gap:6px;">
+                            <button onclick="toggleEditMode('${note.card_id}')" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#818cf8;padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;">✏️ Edit</button>
+                            <button onclick="deleteCard('${note.card_id}')" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;padding:5px 10px;border-radius:8px;cursor:pointer;font-size:0.8rem;">🗑️</button>
+                        </div>
                     </div>
                     <h2 style="font-size:1.4rem;margin-bottom:1rem;">${note.title||'Untitled'}</h2>
                     <p style="color:#cbd5e1;line-height:1.8;margin-bottom:1.5rem;">${note.body||''}</p>
@@ -838,6 +891,22 @@
 
         function closeModal() { document.getElementById('cardModal').style.display = 'none'; }
         document.getElementById('cardModal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+
+        async function deleteCard(cardId) {
+            if (!confirm('Delete this card permanently?')) return;
+            await req(`/notes/${cardId}`, { method: 'DELETE' });
+            closeModal();
+            fetchData();
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeModal();
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+        });
 
         async function deleteRelAndRefresh(relId, cardId) {
             await req(`/relations/${relId}`, {method:'DELETE'});
