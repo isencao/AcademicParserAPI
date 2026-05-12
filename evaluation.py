@@ -226,10 +226,11 @@ def build_report(db) -> Dict[str, Any]:
             if (c.get("card_id") or str(id(c))) not in matched_card_ids
         ]
 
-        correct      = sum(1 for r in rows if r["status"] == "correct")
-        wrong_type   = sum(1 for r in rows if r["status"] == "wrong_type")
-        missing      = sum(1 for r in rows if r["status"] == "missing")
-        wrong_split  = sum(1 for r in rows if r["status"] == "wrong_split")
+        # Metrics are based on the final verdict (user override or auto if untouched)
+        correct      = sum(1 for r in rows if r["verdict"] == "correct")
+        wrong_type   = sum(1 for r in rows if r["verdict"] == "wrong_type")
+        missing      = sum(1 for r in rows if r["verdict"] == "missing")
+        wrong_split  = sum(1 for r in rows if r["verdict"] == "wrong_split")
         noise        = len(noise_cards)
         matched      = len(rows) - missing
 

@@ -329,9 +329,9 @@
                 <span style="font-size:0.78rem;color:var(--text-muted);">Expected vs. Extracted — gold standard comparison</span>
                 <div style="margin-left:auto; display:flex; gap:0.5rem; flex-wrap:wrap;">
                     <button class="btn btn-primary" onclick="loadEvalData()">↻ Refresh</button>
-                    <button class="btn btn-success" onclick="window.location.href=API_URL+'/evaluation/export/csv'">⬇ CSV</button>
-                    <button class="btn btn-success" onclick="window.location.href=API_URL+'/evaluation/export/md'">⬇ Markdown</button>
-                    <button class="btn" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3);" onclick="window.open(API_URL+'/schema/card/export')">📐 Schema JSON</button>
+                    <button class="btn btn-success" onclick="download('/evaluation/export/csv','eval_report.csv')">⬇ CSV</button>
+                    <button class="btn btn-success" onclick="download('/evaluation/export/md','eval_report.md')">⬇ Markdown</button>
+                    <button class="btn" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3);" onclick="download('/schema/card/export','card_schema.json')">📐 Schema JSON</button>
                 </div>
             </div>
             <div id="evalOverall" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.8rem;">
@@ -730,9 +730,19 @@
             });
         }
 
+        async function download(path, filename) {
+            const r = await req(path);
+            if (!r.ok) { alert('Export failed: ' + r.status); return; }
+            const blob = await r.blob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url; a.download = filename; a.click();
+            URL.revokeObjectURL(url);
+        }
+
         function exportData(type) {
-            if (type === 'analytics') window.location.href = `${API_URL}/analytics/export/csv`;
-            else window.location.href = `${API_URL}/notes/export/${type}`;
+            if (type === 'analytics') download('/analytics/export/csv', 'parser_analytics.csv');
+            else download(`/notes/export/${type}`, type === 'csv' ? 'cards_summary.csv' : 'academic_report.md');
         }
         async function clearVault() { if(confirm("Wipe all data?")) { await req('/notes/clear-all', {method:'DELETE'}); fetchData(); } }
         
