@@ -1,0 +1,92 @@
+[
+  {
+    "kind": "definition",
+    "title": "Decision Problem",
+    "key_terms": ["decision problem", "YES", "NO", "instances"],
+    "notes": "Foundational concept; stated in prose without a label — implicit definition."
+  },
+  {
+    "kind": "definition",
+    "title": "Class P",
+    "key_terms": ["P", "polynomial", "deterministic", "algorithm"],
+    "notes": "Defined in prose; must not be merged with NP definition."
+  },
+  {
+    "kind": "definition",
+    "title": "Class NP",
+    "key_terms": ["NP", "certificates", "verifiable", "polynomial time"],
+    "notes": "Separate definition from P; certificate-based characterisation."
+  },
+  {
+    "kind": "definition",
+    "title": "Polynomial-Time Reduction",
+    "key_terms": ["reduction", "polynomial-time", "many-one", "A ≤_p B"],
+    "notes": "Formal reduction definition with notation; must be extracted as definition."
+  },
+  {
+    "kind": "definition",
+    "title": "NP-Hard",
+    "key_terms": ["NP-hard", "every problem in NP", "reduces"],
+    "notes": "Embedded in prose; distinct from NP-complete."
+  },
+  {
+    "kind": "definition",
+    "title": "NP-Complete",
+    "key_terms": ["NP-complete", "NP-hard", "NP"],
+    "notes": "One sentence after NP-hard; must be a separate card."
+  },
+  {
+    "kind": "definition",
+    "title": "3-SAT",
+    "key_terms": ["3-SAT", "conjunctive normal form", "three literals", "clause"],
+    "notes": "Concrete problem definition; Cook-Levin theorem context."
+  },
+  {
+    "kind": "definition",
+    "title": "Vertex Cover",
+    "key_terms": ["vertex cover", "subset", "every edge", "endpoint"],
+    "notes": "Graph theory definition; must be separate from Minimum Vertex Cover."
+  },
+  {
+    "kind": "definition",
+    "title": "Independent Set",
+    "key_terms": ["independent set", "no edges", "complement"],
+    "notes": "Introduced as dual of vertex cover; short but distinct definition."
+  },
+  {
+    "kind": "theorem",
+    "title": "NP-Hardness of Minimum Vertex Cover",
+    "key_terms": ["NP-hard", "vertex cover", "reduction", "3-SAT", "gadget"],
+    "notes": "Reduction proof with variable and clause gadgets — must be theorem."
+  },
+  {
+    "kind": "definition",
+    "title": "α-Approximation Algorithm",
+    "key_terms": ["approximation", "alpha", "OPT", "minimisation"],
+    "notes": "Formal definition of approximation ratio; core concept of section 3."
+  },
+  {
+    "kind": "example",
+    "title": "Greedy 2-Approximation for Vertex Cover",
+    "key_terms": ["greedy", "2-approximation", "vertex cover", "maximal matching"],
+    "notes": "Concrete algorithm with proof sketch — must be example, not theorem."
+  },
+  {
+    "kind": "question",
+    "title": "Breaking the Factor-2 Barrier for Vertex Cover",
+    "key_terms": ["factor 2", "open question", "Unique Games Conjecture", "2 − ε"],
+    "notes": "Explicitly stated as open; must be question not note."
+  },
+  {
+    "kind": "theorem",
+    "title": "PCP Theorem",
+    "key_terms": ["PCP", "NP", "probabilistically checkable", "constant bits"],
+    "notes": "Named theorem; cornerstone of inapproximability — must be theorem."
+  },
+  {
+    "kind": "theorem",
+    "title": "Inapproximability of Max-3-SAT",
+    "key_terms": ["Max-3-SAT", "7/8", "inapproximability", "P ≠ NP"],
+    "notes": "Direct corollary of PCP; must be theorem not note."
+  }
+]

@@ -220,6 +220,17 @@
             <div class="stat-card"><span class="stat-card-value" id="statDocs" style="color:#38bdf8">0</span><span class="stat-card-label">Documents</span></div>
         </div>
 
+        <!-- Extraction method breakdown -->
+        <div id="methodBreakdown" style="display:none; background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:12px; padding:0.75rem 1.2rem; margin-bottom:1rem; gap:1.5rem; align-items:center; flex-wrap:wrap;">
+            <span style="font-size:0.75rem;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;">⚙️ Extraction Methods</span>
+            <span id="methodLLM"    style="font-size:0.82rem;color:#4ade80;">🤖 LLM: <strong>0</strong></span>
+            <span id="methodRule"   style="font-size:0.82rem;color:#fbbf24;">📐 Rule-based: <strong>0</strong></span>
+            <span id="methodOCR"    style="font-size:0.82rem;color:#38bdf8;">📷 OCR: <strong>0</strong></span>
+            <span id="methodRuleWarn" style="display:none; font-size:0.78rem; color:#fbbf24; background:rgba(245,158,11,0.1); padding:3px 10px; border-radius:6px; border:1px solid rgba(245,158,11,0.3);">
+                ⚠️ Rule-based cards have lower accuracy — LLM was unavailable. Verify these cards manually.
+            </span>
+        </div>
+
         <div class="dashboard-grid">
             <div class="stats-panel glass-panel">
                 <h3 style="font-size: 1.1rem;">Distribution</h3>
@@ -450,6 +461,21 @@
                 countUp(document.getElementById('statThms'),  allNotes.filter(n => n.kind === 'theorem').length);
                 countUp(document.getElementById('statRels'),  rels.length);
                 countUp(document.getElementById('statDocs'),  docs);
+
+                // Extraction method breakdown
+                const llmCount  = allNotes.filter(n => n.extraction_method === 'llm').length;
+                const ruleCount = allNotes.filter(n => n.extraction_method === 'rule_based').length;
+                const ocrCount  = allNotes.filter(n => n.extraction_method === 'ocr').length;
+                const breakdown = document.getElementById('methodBreakdown');
+                if (allNotes.length > 0) {
+                    breakdown.style.display = 'flex';
+                    document.getElementById('methodLLM').innerHTML  = `🤖 LLM: <strong>${llmCount}</strong>`;
+                    document.getElementById('methodRule').innerHTML = `📐 Rule-based: <strong>${ruleCount}</strong>`;
+                    document.getElementById('methodOCR').innerHTML  = `📷 OCR: <strong>${ocrCount}</strong>`;
+                    document.getElementById('methodRuleWarn').style.display = ruleCount > 0 ? 'inline-block' : 'none';
+                } else {
+                    breakdown.style.display = 'none';
+                }
             } catch(e) {}
         }
 
@@ -617,8 +643,21 @@
                 } catch(e) {}
 
                 const conf = n.confidence != null ? parseFloat(n.confidence) : null;
-                const confHtml = conf != null ? `<span style="font-size:0.7rem;color:${conf>=0.8?'#4ade80':conf>=0.6?'#fbbf24':'#f87171'}">${(conf*100).toFixed(0)}% conf</span>` : '';
-                const methodHtml = n.extraction_method ? `<span style="font-size:0.65rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${n.extraction_method}</span>` : '';
+                const confColor = conf == null ? '#94a3b8' : conf >= 0.8 ? '#4ade80' : conf >= 0.6 ? '#fbbf24' : '#f87171';
+                const confHtml  = conf != null ? `<span style="font-size:0.7rem;color:${confColor}">${(conf*100).toFixed(0)}% conf</span>` : '';
+
+                const isRuleBased = n.extraction_method === 'rule_based';
+                const isLowConf   = conf != null && conf < 0.6;
+                const methodColor = isRuleBased ? '#fbbf24' : n.extraction_method === 'ocr' ? '#38bdf8' : 'var(--text-muted)';
+                const methodHtml  = n.extraction_method
+                    ? `<span style="font-size:0.65rem;color:${methodColor};background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${n.extraction_method}</span>`
+                    : '';
+
+                // Confidence / rule-based warning banner on the card
+                const warnHtml = (isLowConf || isRuleBased) ? `
+                    <div style="margin-top:0.6rem;padding:4px 8px;border-radius:6px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);font-size:0.7rem;color:#fbbf24;">
+                        ⚠️ ${isRuleBased ? 'Rule-based extraction — LLM was unavailable. Kind may be misclassified.' : 'Low confidence — verify this card manually.'}
+                    </div>` : '';
 
                 return `
                 <div class="note-card ${isSummary ? 'card-SUMMARY' : 'card-'+(n.kind||'').toUpperCase()}" style="cursor:pointer;animation-delay:${Math.min(idx*0.04,0.4)}s" onclick="openCard('${n.card_id}')" title="Click for details">
@@ -630,6 +669,7 @@
                     <div class="note-content">${highlight(n.body || '', q)}</div>
                     ${anchorsHtml}
                     ${tagsHtml}
+                    ${warnHtml}
                     <div class="note-footer">
                         <span>📄 ${n.doc_id || 'Unknown'}</span>
                         <span style="color:var(--primary); font-weight:bold;">🔖 Page: ${n.span_hint || '-'}</span>
@@ -826,12 +866,37 @@
                 relHtml = '<span style="color:var(--text-muted);font-size:0.85rem;">No relations yet. Use Auto-Suggest or add one manually.</span>';
             }
 
-            const conf = note.confidence != null ? `${(parseFloat(note.confidence)*100).toFixed(0)}%` : '—';
+            const confVal  = note.confidence != null ? parseFloat(note.confidence) : null;
+            const conf     = confVal != null ? `${(confVal*100).toFixed(0)}%` : '—';
+            const confColor = confVal == null ? '#94a3b8' : confVal >= 0.8 ? '#4ade80' : confVal >= 0.6 ? '#fbbf24' : '#f87171';
+            const isRuleBasedModal = note.extraction_method === 'rule_based';
+            const isLowConfModal   = confVal != null && confVal < 0.6;
+
+            const CONF_EXPLAIN = {
+                high:   'Explicit label found in source text (e.g. "Definition:", "Theorem 3:"). High reliability.',
+                medium: 'Kind inferred from document structure. Verify the card type is correct.',
+                low:    'Kind is ambiguous — extracted from context without a clear label. Manual review recommended.',
+            };
+            const confLevel = confVal == null ? null : confVal >= 0.8 ? 'high' : confVal >= 0.6 ? 'medium' : 'low';
+
+            const modalWarnHtml = (isLowConfModal || isRuleBasedModal) ? `
+                <div style="margin-bottom:1.2rem;padding:0.7rem 1rem;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);">
+                    <div style="font-size:0.8rem;font-weight:700;color:#fbbf24;margin-bottom:4px;">
+                        ⚠️ ${isRuleBasedModal ? 'Rule-based fallback extraction' : 'Low confidence card'}
+                    </div>
+                    <div style="font-size:0.78rem;color:#94a3b8;line-height:1.5;">
+                        ${isRuleBasedModal
+                            ? 'The LLM was unavailable when this document was processed (rate limit or API error). This card was extracted using regex patterns — the kind classification and title may be inaccurate. Consider re-processing when the LLM is available.'
+                            : CONF_EXPLAIN[confLevel] || ''}
+                    </div>
+                </div>` : '';
+
             const kindOptions = ['definition','theorem','lemma','example','question','note','summary']
                 .map(k => `<option value="${k}" ${k===note.kind?'selected':''}>${k}</option>`).join('');
 
             document.getElementById('modalContent').innerHTML = `
                 <div id="viewMode">
+                    ${modalWarnHtml}
                     <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;">
                         <span style="background:${KIND_COLOR[note.kind]||'#6366f1'}22;color:${KIND_COLOR[note.kind]||'#6366f1'};padding:4px 14px;border-radius:20px;font-size:0.75rem;font-weight:800;text-transform:uppercase;">${note.kind}</span>
                         <span style="font-size:0.75rem;color:var(--text-muted);">📄 ${note.doc_id||'—'}</span>
