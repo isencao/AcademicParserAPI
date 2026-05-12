@@ -144,6 +144,12 @@
         .eval-summary-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; padding: 1rem 0; font-size: 0.9rem; }
         .eval-stat { display: flex; align-items: center; gap: 6px; }
         .eval-doc-filter { background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; }
+        /* EVAL METRIC CARDS */
+        .eval-metric-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 0.8rem; text-align: center; }
+        .eval-metric-value { font-size: 1.8rem; font-weight: 800; color: #f1f5f9; line-height: 1; }
+        .eval-metric-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+        /* EVAL VERDICT SELECT */
+        .eval-verdict-select { background: var(--bg); border: 1px solid var(--border); color: white; padding: 3px 6px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -316,40 +322,25 @@
 
     <!-- EVAL PANEL -->
     <div class="main" id="evalPanel" style="display:none;">
+        <!-- Header + overall metrics -->
         <div class="glass-panel">
-            <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-                <h2 style="font-size:1.2rem;">🔬 Evaluation Table</h2>
-                <select id="evalDocFilter" class="eval-doc-filter" onchange="renderEvalTable()">
-                    <option value="ALL">All Documents</option>
-                </select>
-                <button class="btn btn-primary" onclick="loadEvalData()" style="margin-left:auto;">↻ Refresh</button>
-                <button class="btn btn-success" onclick="exportEvalCSV()">Export Eval CSV</button>
+            <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem;">
+                <h2 style="font-size:1.2rem;">🔬 Evaluation Report</h2>
+                <span style="font-size:0.78rem;color:var(--text-muted);">Expected vs. Extracted — gold standard comparison</span>
+                <div style="margin-left:auto; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="loadEvalData()">↻ Refresh</button>
+                    <button class="btn btn-success" onclick="window.location.href=API_URL+'/evaluation/export/csv'">⬇ CSV</button>
+                    <button class="btn btn-success" onclick="window.location.href=API_URL+'/evaluation/export/md'">⬇ Markdown</button>
+                    <button class="btn" style="background:rgba(99,102,241,0.12);color:#818cf8;border:1px solid rgba(99,102,241,0.3);" onclick="window.open(API_URL+'/schema/card/export')">📐 Schema JSON</button>
+                </div>
             </div>
-            <div class="eval-summary-bar" id="evalSummaryBar">
-                <span style="color:var(--text-muted); font-size:0.85rem;">Upload a PDF from Dashboard, then come here to review extracted cards.</span>
+            <div id="evalOverall" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:0.8rem;">
+                <span style="color:var(--text-muted);font-size:0.85rem;grid-column:1/-1;">Loading report from backend…</span>
             </div>
         </div>
 
-        <div class="glass-panel">
-            <div class="eval-table-wrap">
-                <table class="eval-table">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Kind</th>
-                            <th>Title</th>
-                            <th>Page</th>
-                            <th>Body Preview</th>
-                            <th>Verdict</th>
-                            <th>Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody id="evalTableBody">
-                        <tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">No cards yet — upload a document first.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <!-- Per-doc breakdown -->
+        <div id="evalDocs"></div>
     </div>
 
     <div class="chat-widget">
@@ -1023,109 +1014,155 @@
         }
 
         // ── EVAL ────────────────────────────────────────────────────────────
-        let evalNotes = [], evalVerdicts = {};
 
         async function loadEvalData() {
+            document.getElementById('evalOverall').innerHTML =
+                '<span style="color:var(--text-muted);font-size:0.85rem;grid-column:1/-1;">⏳ Loading evaluation report…</span>';
+            document.getElementById('evalDocs').innerHTML = '';
             try {
-                const r = await req('/notes');
-                evalNotes = await r.json();
-                populateDocFilter();
-                renderEvalTable();
-            } catch(e) { console.error('Eval load error', e); }
+                const r = await req('/evaluation/report');
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const report = await r.json();
+                renderEvalReport(report);
+            } catch(e) {
+                document.getElementById('evalOverall').innerHTML =
+                    `<span style="color:#f87171;grid-column:1/-1;">Failed to load report: ${e.message}. Make sure eval/expected/*.json files exist and at least one document has been processed.</span>`;
+            }
         }
 
-        function populateDocFilter() {
-            const sel = document.getElementById('evalDocFilter');
-            const docs = [...new Set(evalNotes.map(n => n.doc_id).filter(Boolean))];
-            sel.innerHTML = '<option value="ALL">All Documents</option>' +
-                docs.map(d => `<option value="${d}">${d}</option>`).join('');
+        function renderEvalReport(report) {
+            if (report.error) {
+                document.getElementById('evalOverall').innerHTML =
+                    `<span style="color:#f87171;grid-column:1/-1;">${report.error}</span>`;
+                return;
+            }
+            const o = report.overall || {};
+            const metricCard = (label, val, color) =>
+                `<div class="eval-metric-card" style="${color ? `border-color:${color}44` : ''}">
+                    <div class="eval-metric-value" style="${color ? `color:${color}` : ''}">${val}</div>
+                    <div class="eval-metric-label">${label}</div>
+                </div>`;
+
+            document.getElementById('evalOverall').innerHTML = [
+                metricCard('Expected',   o.expected   || 0, ''),
+                metricCard('Extracted',  o.extracted  || 0, ''),
+                metricCard('Correct',    o.correct    || 0, '#4ade80'),
+                metricCard('Wrong Type', o.wrong_type || 0, '#f87171'),
+                metricCard('Missing',    o.missing    || 0, '#f87171'),
+                metricCard('Wrong Split',o.wrong_split|| 0, '#fbbf24'),
+                metricCard('Noise',      o.noise      || 0, '#94a3b8'),
+                metricCard('Accuracy',   `${o.accuracy || 0}%`, '#818cf8'),
+            ].join('');
+
+            document.getElementById('evalDocs').innerHTML =
+                (report.docs || []).map(renderDocEval).join('');
         }
 
-        function renderEvalTable() {
-            const docFilter = document.getElementById('evalDocFilter').value;
-            const notes = evalNotes.filter(n =>
-                n.kind !== 'summary' && (docFilter === 'ALL' || n.doc_id === docFilter)
-            );
+        function renderDocEval(doc) {
+            const STATUS_COLORS = {
+                correct:'#4ade80', wrong_type:'#f87171', missing:'#f87171',
+                wrong_split:'#fbbf24', noise:'#94a3b8', pending:'#818cf8'
+            };
+            const STATUS_LABELS = {
+                correct:'✅ Correct', wrong_type:'❌ Wrong type', missing:'⚠️ Missing',
+                wrong_split:'🔀 Wrong split', noise:'🔊 Noise', pending:'⏳ Pending'
+            };
 
-            const kindClass = { definition:'kind-definition', theorem:'kind-theorem', lemma:'kind-lemma',
-                                example:'kind-example', question:'kind-question', note:'kind-note', summary:'kind-summary' };
+            const verdictOptions = ['correct','wrong_type','missing','wrong_split','noise','pending']
+                .map(v => `<option value="${v}">${STATUS_LABELS[v]||v}</option>`).join('');
 
-            const rows = notes.map((n, i) => {
-                const id = n.card_id || n.id;
-                const v = evalVerdicts[id] || {};
-                const body = (n.body || '').replace(/</g,'&lt;').slice(0, 120);
-                const klass = kindClass[n.kind] || '';
-                const btn = (label, cls, val) =>
-                    `<button class="verdict-btn ${v.verdict === val ? 'selected-'+cls : ''}"
-                        onclick="setVerdict('${id}','${val}',this)">${label}</button>`;
+            const rows = (doc.rows || []).map((row, i) => {
+                const sc = STATUS_COLORS[row.status] || '#94a3b8';
+                const sl = STATUS_LABELS[row.status] || row.status;
+                const opts = ['correct','wrong_type','missing','wrong_split','noise','pending']
+                    .map(v => `<option value="${v}" ${row.verdict===v?'selected':''}>${STATUS_LABELS[v]||v}</option>`).join('');
+                const expKind  = row.expected_kind  || '—';
+                const extKind  = row.extracted_kind || '—';
+                const extTitle = row.extracted_title || '—';
+                const note     = (row.note || '').replace(/"/g, '&quot;');
                 return `<tr>
                     <td style="color:var(--text-muted)">${i+1}</td>
-                    <td><span class="kind-badge ${klass}">${n.kind}</span></td>
-                    <td style="font-weight:600; max-width:200px;">${(n.title||'').slice(0,60)}</td>
-                    <td style="color:var(--text-muted); white-space:nowrap;">${n.span_hint||'-'}</td>
-                    <td style="color:#94a3b8; max-width:260px; font-size:0.8rem;">${body}…</td>
-                    <td style="white-space:nowrap;">
-                        ${btn('✅ Correct','correct','correct')}
-                        ${btn('❌ Wrong type','wrong','wrong')}
-                        ${btn('🔀 Wrong split','split','split')}
-                        ${btn('🔊 Noise','noise','noise')}
+                    <td><span class="kind-badge kind-${expKind}">${expKind}</span></td>
+                    <td style="font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${row.expected_title||''}">${row.expected_title||'—'}</td>
+                    <td style="color:${row.extracted_title?'#f1f5f9':'#475569'};max-width:180px;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${extTitle}">${extTitle}</td>
+                    <td>${row.extracted_kind ? `<span class="kind-badge kind-${extKind}">${extKind}</span>` : '<span style="color:#475569">—</span>'}</td>
+                    <td><span style="color:${sc};font-size:0.78rem;font-weight:700;white-space:nowrap;">${sl}</span></td>
+                    <td>
+                        <select class="eval-verdict-select"
+                            data-row-id="${row.row_id}"
+                            data-doc-id="${doc.doc}"
+                            onchange="saveVerdict(this)">
+                            ${opts}
+                        </select>
                     </td>
-                    <td><input class="eval-note-input" placeholder="note…"
-                        value="${v.note||''}"
-                        onchange="setNote('${id}', this.value)"></td>
+                    <td><input class="eval-note-input" placeholder="note…" value="${note}"
+                        onblur="saveVerdictNote(this,'${row.row_id}','${doc.doc}')"></td>
                 </tr>`;
             }).join('');
 
-            document.getElementById('evalTableBody').innerHTML = rows ||
-                '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-muted);">No cards for this document.</td></tr>';
+            const m = doc.metrics || {};
+            let noiseHtml = '';
+            if (doc.noise_cards && doc.noise_cards.length) {
+                noiseHtml = `<div style="margin-top:1rem;padding:0.75rem 1rem;background:rgba(148,163,184,0.05);border:1px solid rgba(148,163,184,0.2);border-radius:8px;">
+                    <div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:0.5rem;">🔊 Noise cards (${doc.noise_cards.length}) — extracted but not in expected gold standard:</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                    ${doc.noise_cards.map(c =>
+                        `<span style="padding:3px 10px;border-radius:6px;font-size:0.75rem;background:rgba(148,163,184,0.1);color:#94a3b8;">
+                            <span class="kind-badge kind-${c.kind||'note'}" style="font-size:0.62rem;padding:1px 5px;">${c.kind||'?'}</span>
+                            ${(c.title||'?').slice(0,40)}
+                        </span>`
+                    ).join('')}
+                    </div>
+                </div>`;
+            }
 
-            renderEvalSummary(notes);
+            return `<div class="glass-panel" style="margin-bottom:1rem;">
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
+                    <h3 style="font-size:1rem;color:#f1f5f9;">📄 ${doc.doc}</h3>
+                    <span style="color:#4ade80;font-size:0.8rem;font-weight:700;">✅ ${m.correct||0} correct</span>
+                    <span style="color:#f87171;font-size:0.8rem;">❌ ${m.missing||0} missing · ${m.wrong_type||0} wrong type</span>
+                    <span style="color:#94a3b8;font-size:0.8rem;">🔊 ${m.noise||0} noise</span>
+                    <span style="color:var(--text-muted);font-size:0.78rem;">Expected: ${m.expected||0} · Extracted: ${m.extracted||0}</span>
+                </div>
+                <div class="eval-table-wrap">
+                    <table class="eval-table">
+                        <thead><tr>
+                            <th>#</th><th>Exp Kind</th><th>Expected Title</th>
+                            <th>Extracted Title</th><th>Ext Kind</th>
+                            <th>Auto Status</th><th>Your Verdict</th><th>Note</th>
+                        </tr></thead>
+                        <tbody>${rows || '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted);">No DB cards found for this document. Load demo or upload the document first.</td></tr>'}</tbody>
+                    </table>
+                </div>
+                ${noiseHtml}
+            </div>`;
         }
 
-        function setVerdict(id, val, btn) {
-            if (!evalVerdicts[id]) evalVerdicts[id] = {};
-            evalVerdicts[id].verdict = evalVerdicts[id].verdict === val ? null : val;
-            renderEvalTable();
+        async function saveVerdict(select) {
+            const rowId   = select.dataset.rowId;
+            const docId   = select.dataset.docId;
+            const verdict = select.value;
+            const row     = select.closest('tr');
+            const note    = row ? (row.querySelector('.eval-note-input')?.value || '') : '';
+            try {
+                await req('/evaluation/verdict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({row_id: rowId, doc_id: docId, verdict, note})
+                });
+            } catch(e) { console.error('Verdict save failed', e); }
         }
 
-        function setNote(id, val) {
-            if (!evalVerdicts[id]) evalVerdicts[id] = {};
-            evalVerdicts[id].note = val;
-        }
-
-        function renderEvalSummary(notes) {
-            const total   = notes.length;
-            const correct = Object.values(evalVerdicts).filter(v => v.verdict === 'correct').length;
-            const wrong   = Object.values(evalVerdicts).filter(v => v.verdict === 'wrong').length;
-            const split   = Object.values(evalVerdicts).filter(v => v.verdict === 'split').length;
-            const noise   = Object.values(evalVerdicts).filter(v => v.verdict === 'noise').length;
-            const pending = total - correct - wrong - split - noise;
-            document.getElementById('evalSummaryBar').innerHTML = `
-                <span class="eval-stat">📋 Total: <strong>${total}</strong></span>
-                <span class="eval-stat" style="color:#4ade80">✅ Correct: <strong>${correct}</strong></span>
-                <span class="eval-stat" style="color:#f87171">❌ Wrong type: <strong>${wrong}</strong></span>
-                <span class="eval-stat" style="color:#fbbf24">🔀 Wrong split: <strong>${split}</strong></span>
-                <span class="eval-stat" style="color:#94a3b8">🔊 Noise: <strong>${noise}</strong></span>
-                <span class="eval-stat" style="color:var(--text-muted)">⏳ Pending: <strong>${pending}</strong></span>`;
-        }
-
-        function exportEvalCSV() {
-            const docFilter = document.getElementById('evalDocFilter').value;
-            const notes = evalNotes.filter(n =>
-                n.kind !== 'summary' && (docFilter === 'ALL' || n.doc_id === docFilter)
-            );
-            const rows = [['#','card_id','doc_id','kind','title','span_hint','body_preview','verdict','note']];
-            notes.forEach((n, i) => {
-                const v = evalVerdicts[n.card_id || n.id] || {};
-                rows.push([i+1, n.card_id||'', n.doc_id||'', n.kind||'', (n.title||'').replace(/,/g,' '),
-                    n.span_hint||'', (n.body||'').slice(0,80).replace(/,/g,' ').replace(/\n/g,' '),
-                    v.verdict||'pending', (v.note||'').replace(/,/g,' ')]);
-            });
-            const csv = rows.map(r => r.join(',')).join('\n');
-            const a = document.createElement('a');
-            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-            a.download = `eval_${docFilter}_${new Date().toISOString().slice(0,10)}.csv`;
-            a.click();
+        async function saveVerdictNote(input, rowId, docId) {
+            const row     = input.closest('tr');
+            const verdict = row ? (row.querySelector('.eval-verdict-select')?.value || 'pending') : 'pending';
+            try {
+                await req('/evaluation/verdict', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({row_id: rowId, doc_id: docId, verdict, note: input.value})
+                });
+            } catch(e) { console.error('Note save failed', e); }
         }
         // ── END EVAL ─────────────────────────────────────────────────────────
 

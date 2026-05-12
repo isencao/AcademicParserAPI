@@ -394,3 +394,72 @@ def export_analytics_csv(db: IDocumentRepository = Depends(get_db_repository)):
         else:
             f.write("No analytics data available yet.\n")
     return FileResponse(file_path, media_type="text/csv", filename="parser_analytics.csv")
+
+
+# ── EVALUATION ENDPOINTS ──────────────────────────────────────────────────────
+
+class EvaluationVerdictRequest(BaseModel):
+    row_id: str
+    doc_id: str
+    verdict: str
+    note: str = ""
+
+
+@router.get("/api/evaluation/report")
+def get_evaluation_report(db: IDocumentRepository = Depends(get_db_repository)):
+    """Compare DB cards against eval/expected/*.json gold standards and return structured metrics."""
+    from evaluation import build_report
+    return build_report(db)
+
+
+@router.post("/api/evaluation/verdict")
+def save_evaluation_verdict(req: EvaluationVerdictRequest, db: IDocumentRepository = Depends(get_db_repository)):
+    """Persist a user verdict for a specific evaluation row."""
+    valid_verdicts = {"correct", "wrong_type", "missing", "wrong_split", "noise", "pending"}
+    if req.verdict not in valid_verdicts:
+        raise HTTPException(status_code=400, detail=f"verdict must be one of {valid_verdicts}")
+    db.save_verdict(req.row_id, req.doc_id, req.verdict, req.note)
+    return {"message": "Verdict saved."}
+
+
+@router.get("/api/evaluation/export/csv")
+def export_evaluation_csv(db: IDocumentRepository = Depends(get_db_repository)):
+    """Export the full evaluation report as CSV (with persisted verdicts)."""
+    from evaluation import build_report, report_to_csv_string
+    report = build_report(db)
+    csv_content = report_to_csv_string(report)
+    file_path = "eval_report_export.csv"
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(csv_content)
+    return FileResponse(file_path, media_type="text/csv", filename="eval_report.csv")
+
+
+@router.get("/api/evaluation/export/md")
+def export_evaluation_md(db: IDocumentRepository = Depends(get_db_repository)):
+    """Export the full evaluation report as Markdown (with persisted verdicts)."""
+    from evaluation import build_report, report_to_markdown_string
+    report = build_report(db)
+    md_content = report_to_markdown_string(report)
+    file_path = "eval_report_export.md"
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(md_content)
+    return FileResponse(file_path, media_type="text/markdown", filename="eval_report.md")
+
+
+# ── CARD SCHEMA ENDPOINTS ─────────────────────────────────────────────────────
+
+@router.get("/api/schema/card")
+def get_card_schema():
+    """Return the canonical card schema definition."""
+    from evaluation import CARD_SCHEMA
+    return CARD_SCHEMA
+
+
+@router.get("/api/schema/card/export")
+def export_card_schema():
+    """Download the card schema as a JSON file."""
+    from evaluation import CARD_SCHEMA
+    file_path = "card_schema.json"
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(CARD_SCHEMA, f, indent=2, ensure_ascii=False)
+    return FileResponse(file_path, media_type="application/json", filename="card_schema.json")

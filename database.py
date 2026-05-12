@@ -55,6 +55,12 @@ class IDocumentRepository(ABC):
     @abstractmethod
     def clear_auto_relations(self) -> None: pass
 
+    @abstractmethod
+    def save_verdict(self, row_id: str, doc_id: str, verdict: str, note: str = "") -> None: pass
+
+    @abstractmethod
+    def get_verdicts(self) -> List[Dict[str, Any]]: pass
+
 class SQLiteDocumentRepository(IDocumentRepository):
     def __init__(self, db_path: str = "academic_notes.db"):
         self.db_path = db_path
@@ -121,6 +127,15 @@ class SQLiteDocumentRepository(IDocumentRepository):
                     process_time_sec REAL,
                     total_tokens INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS evaluation_verdicts (
+                    row_id TEXT PRIMARY KEY,
+                    doc_id TEXT,
+                    verdict TEXT,
+                    note TEXT DEFAULT '',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             conn.commit()
@@ -240,6 +255,25 @@ class SQLiteDocumentRepository(IDocumentRepository):
         with self._get_connection() as conn:
             conn.cursor().execute("DELETE FROM card_relations WHERE created_by='auto'")
             conn.commit()
+
+    def save_verdict(self, row_id: str, doc_id: str, verdict: str, note: str = "") -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO evaluation_verdicts (row_id, doc_id, verdict, note)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(row_id) DO UPDATE SET
+                    verdict=excluded.verdict,
+                    note=excluded.note,
+                    updated_at=CURRENT_TIMESTAMP
+            """, (row_id, doc_id, verdict, note))
+            conn.commit()
+
+    def get_verdicts(self) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM evaluation_verdicts")
+            return [dict(row) for row in cursor.fetchall()]
 
 def get_db_repository() -> IDocumentRepository:
     return SQLiteDocumentRepository()

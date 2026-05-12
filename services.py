@@ -290,7 +290,8 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
                 total_tokens_used += batch_tokens
                 
                 for idx, n in enumerate(notes):
-                    card_id = f"{doc_id}_{i:04d}_{slugify(n.get('kind', 'note'))}"
+                    title_slug = slugify(n.get("title", ""))[:20]
+                    card_id = f"{doc_id}_{i:04d}_{idx:02d}_{slugify(n.get('kind', 'note'))}_{title_slug}"
                     n["card_id"] = card_id
                     n["doc_id"] = doc_id
                     all_notes.append(n)
@@ -337,7 +338,8 @@ def process_file_in_batches(filepath, target_lang="auto", batch_size=5, progress
                     total_tokens_used += batch_tokens
 
                     for idx, n in enumerate(notes):
-                        card_id = f"{doc_id}_{start_page+idx:04d}_{slugify(n.get('kind', 'note'))}"
+                        title_slug = slugify(n.get("title", ""))[:20]
+                        card_id = f"{doc_id}_{start_page:04d}_{idx:02d}_{slugify(n.get('kind', 'note'))}_{title_slug}"
                         n["card_id"] = card_id
                         n["doc_id"] = doc_id
                         if batch_used_ocr:
@@ -369,6 +371,14 @@ def auto_suggest_relations(notes: list) -> list[dict]:
       any pair with 3+ shared anchors                      → related_to
     Returns list of {source, target, relation_type} dicts (no duplicates, no self-loops).
     """
+    # Generic tokens that appear in almost every card — exclude them from
+    # shared-anchor counting to avoid spurious relations.
+    _NOISE_TOKENS: set[str] = {
+        "definition", "theorem", "lemma", "example", "question",
+        "note", "summary", "formal", "proof", "mathematics",
+        "introduction", "overview", "result", "claim", "statement",
+    }
+
     def parse_tokens(note: dict) -> set[str]:
         tokens: set[str] = set()
         for field in ("anchors", "tags"):
@@ -378,7 +388,7 @@ def auto_suggest_relations(notes: list) -> list[dict]:
                 tokens.update(str(t).lower().strip() for t in items if t)
             except Exception:
                 pass
-        return tokens
+        return tokens - _NOISE_TOKENS
 
     non_summary = [n for n in notes if n.get("kind") != "summary" and n.get("card_id")]
     token_map = {n["card_id"]: parse_tokens(n) for n in non_summary}
@@ -422,8 +432,8 @@ def auto_suggest_relations(notes: list) -> list[dict]:
                 add(a, b, "depends_on")
             elif kb == "lemma" and ka == "definition":
                 add(b, a, "depends_on")
-            # generic related_to for strong overlap
-            elif n_shared >= 3:
+            # generic related_to — raised threshold to 4 to reduce noise
+            elif n_shared >= 4:
                 add(a, b, "related_to")
 
     logger.info(f"Auto-suggest produced {len(suggestions)} relation(s) for {len(non_summary)} cards.")
