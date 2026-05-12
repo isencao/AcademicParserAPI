@@ -189,7 +189,9 @@ class SQLiteDocumentRepository(IDocumentRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM notes")
-            cursor.execute("DELETE FROM processed_files") 
+            cursor.execute("DELETE FROM processed_files")
+            cursor.execute("DELETE FROM card_relations")
+            cursor.execute("DELETE FROM evaluation_verdicts")
             conn.commit()
 
     def is_file_processed(self, file_hash: str) -> bool:
